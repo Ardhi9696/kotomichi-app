@@ -22,13 +22,14 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import type { Direction } from '@/lib/srs/directions';
-import type { Role } from '@/lib/domain';
+import type { Role, ThemeMode } from '@/lib/domain';
 
 export const userProfile = pgTable('user_profile', {
   id: uuid('id').primaryKey(),
   displayName: text('display_name').notNull().default(''),
   role: text('role').$type<Role>().notNull().default('user'),
   preferredLocale: text('preferred_locale').notNull().default('en'),
+  theme: text('theme').$type<ThemeMode>().notNull().default('system'),
   level: integer('level').notNull().default(1),
   exp: integer('exp').notNull().default(0),
   lastReviewDate: date_('last_review_date'),

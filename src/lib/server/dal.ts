@@ -39,6 +39,7 @@ function ensureProfile(authUser: SessionUser): Promise<UserProfile> {
       displayName: authUser.email.split('@')[0] ?? 'Learner',
       role: 'user',
       preferredLocale: 'en',
+      theme: 'system',
       level: 1,
       exp: 0,
       lastReviewDate: null,

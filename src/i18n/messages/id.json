@@ -11,7 +11,8 @@
     "login": "Masuk",
     "register": "Buat akun",
     "logout": "Keluar",
-    "menu": "Menu"
+    "menu": "Menu",
+    "setting": "Pengaturan"
   },
   "auth": {
     "signInTitle": "Selamat datang kembali",
@@ -119,6 +120,7 @@
     "search": "Cari…",
     "add": "Tambah",
     "save": "Simpan",
+    "saving": "Menyimpan…",
     "delete": "Hapus",
     "edit": "Ubah",
     "cancel": "Batal",
@@ -177,7 +179,11 @@
     "editUserTitle": "Edit pengguna",
     "passwordFixedNote": "Password dibuat sekali saat akun dibuat dan tidak dapat diubah di sini.",
     "settingsSubtitle": "Konfigurasi global — khusus super admin.",
-    "signupEnabled": "Izinkan pendaftaran mandiri"
+    "signupEnabled": "Izinkan pendaftaran mandiri",
+    "resetPasswordEnabled": "Izinkan reset kata sandi (lupa kata sandi)",
+    "configSaved": "Konfigurasi berhasil disimpan.",
+    "invalidDailyNewCap": "Kartu baru harian harus berupa angka positif.",
+    "invalidDesiredRetention": "Retensi target harus antara 0 dan 1."
   },
   "common": {
     "back": "Kembali",
@@ -195,5 +201,21 @@
     "logoutTitle": "Keluar dari Kotomichi?",
     "logoutDescription": "Progresmu tersimpan dan akan menunggu saat kamu kembali.",
     "confirm": "Keluar"
+  },
+  "settings": {
+    "title": "Pengaturan pengguna",
+    "displayName": "Nama tampilan",
+    "language": "Bahasa",
+    "languageEn": "English",
+    "languageId": "Bahasa Indonesia",
+    "theme": "Tema",
+    "themeLight": "Terang",
+    "themeDark": "Gelap",
+    "themeSystem": "Sistem",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "missingFields": "Nama tampilan wajib diisi.",
+    "invalidLocale": "Bahasa tidak valid.",
+    "invalidTheme": "Tema tidak valid."
   }
 }

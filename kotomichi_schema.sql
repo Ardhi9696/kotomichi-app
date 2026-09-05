@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS user_profile (
     role                TEXT        NOT NULL DEFAULT 'user'
                         CHECK (role IN ('super_admin', 'admin', 'user')),
     preferred_locale    TEXT        NOT NULL DEFAULT 'en',
+    theme               TEXT        NOT NULL DEFAULT 'system'
+                        CHECK (theme IN ('light', 'dark', 'system')),
     -- gamification
     level               INT         NOT NULL DEFAULT 1,
     exp                 INT         NOT NULL DEFAULT 0,
@@ -210,7 +212,9 @@ INSERT INTO app_config (key, value_json, description) VALUES
     ('deck.mastery_threshold',          '{"value": 0.9}',                 'avg R needed on current deck to unlock the next'),
     ('fsrs.decay',                      '{"value": -0.5}',                'FSRS-4.5 forgetting-curve decay'),
     ('fsrs.factor',                     '{"value": 0.2345679012345679}',  'FSRS-4.5 factor = 19/81'),
-    ('fsrs.weights',                    '{"value": [0.4872,1.4003,3.7145,13.8206,5.1618,1.2298,0.8975,0.031,1.6474,0.1367,1.0461,2.1072,0.0793,0.3246,1.587,0.2272,2.8755]}', 'FSRS-4.5 default weights (17)')
+    ('fsrs.weights',                    '{"value": [0.4872,1.4003,3.7145,13.8206,5.1618,1.2298,0.8975,0.031,1.6474,0.1367,1.0461,2.1072,0.0793,0.3246,1.587,0.2272,2.8755]}', 'FSRS-4.5 default weights (17)'),
+    ('signup.enabled',                  '{"value": true}',               'Allow self-registration (Create account link on login)'),
+    ('signup.reset_password',           '{"value": true}',               'Allow password reset (Forgot password link on login)')
 ON CONFLICT (key) DO NOTHING;
 
 -- ------------------------------------------------------------

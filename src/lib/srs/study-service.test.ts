@@ -9,6 +9,7 @@ const USER: UserProfile = {
   displayName: 'Learner',
   role: 'user',
   preferredLocale: 'id',
+  theme: 'system',
   level: 1,
   exp: 0,
   lastReviewDate: null,

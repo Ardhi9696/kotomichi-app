@@ -7,6 +7,8 @@ import type { Direction } from '@/lib/srs/directions';
 
 export type Role = 'super_admin' | 'admin' | 'user';
 
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
 
 /** An audit record of a role change performed by a super admin. */
@@ -24,6 +26,7 @@ export interface UserProfile {
   displayName: string;
   role: Role;
   preferredLocale: string;
+  theme: ThemeMode;
   level: number;
   exp: number;
   lastReviewDate: string | null;
@@ -154,6 +157,7 @@ export interface AppConfig {
   };
   signup: {
     enabled: boolean;
+    resetPassword: boolean;
   };
 }
 

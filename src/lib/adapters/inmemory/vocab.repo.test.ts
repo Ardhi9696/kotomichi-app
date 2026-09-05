@@ -57,7 +57,7 @@ describe('InMemoryVocabRepo', () => {
   it('runs a seeded demo profile through a review round trip', async () => {
     const repo = new InMemoryVocabRepo();
     await repo.createUserProfile({
-      id: USER, displayName: 'Tester', role: 'user', preferredLocale: 'id',
+      id: USER, displayName: 'Tester', role: 'user', preferredLocale: 'id', theme: 'system',
       level: 1, exp: 0, lastReviewDate: null, currentStreak: 0, longestStreak: 0,
       createdAt: NOW,
     });
@@ -106,7 +106,7 @@ describe('InMemoryVocabRepo', () => {
     const repo = new InMemoryVocabRepo();
     await repo.createUserProfile({
       id: '22222222-2222-2222-2222-222222222222', displayName: 'Target', role: 'user',
-      preferredLocale: 'en', level: 1, exp: 0, lastReviewDate: null,
+      preferredLocale: 'en', theme: 'system', level: 1, exp: 0, lastReviewDate: null,
       currentStreak: 0, longestStreak: 0, createdAt: NOW,
     });
 

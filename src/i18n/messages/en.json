@@ -12,8 +12,7 @@
     "register": "Create account",
     "logout": "Log out",
     "menu": "Menu",
-    "theme": "Theme",
-    "language": "Language"
+    "setting": "Settings"
   },
   "auth": {
     "signInTitle": "Welcome back",
@@ -121,6 +120,7 @@
     "search": "Search…",
     "add": "Add",
     "save": "Save",
+    "saving": "Saving…",
     "delete": "Delete",
     "edit": "Edit",
     "cancel": "Cancel",
@@ -179,7 +179,11 @@
     "editUserTitle": "Edit user",
     "passwordFixedNote": "The password is set once when the account is created and cannot be changed here.",
     "settingsSubtitle": "Global configuration — super admin only.",
-    "signupEnabled": "Allow self-registration"
+    "signupEnabled": "Allow self-registration",
+    "resetPasswordEnabled": "Allow password reset (forgot password)",
+    "configSaved": "Configuration saved.",
+    "invalidDailyNewCap": "Daily new cards must be a positive number.",
+    "invalidDesiredRetention": "Desired retention must be between 0 and 1."
   },
   "common": {
     "back": "Back",
@@ -197,5 +201,21 @@
     "logoutTitle": "Log out of Kotomichi?",
     "logoutDescription": "Your progress is saved and will be waiting when you return.",
     "confirm": "Log out"
+  },
+  "settings": {
+    "title": "User settings",
+    "displayName": "Display name",
+    "language": "Language",
+    "languageEn": "English",
+    "languageId": "Bahasa Indonesia",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "save": "Save",
+    "cancel": "Cancel",
+    "missingFields": "Display name is required.",
+    "invalidLocale": "Invalid language.",
+    "invalidTheme": "Invalid theme."
   }
 }

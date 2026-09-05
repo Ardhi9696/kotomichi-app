@@ -39,6 +39,7 @@ async function seedMemberProfiles(mem: InMemoryVocabRepo): Promise<void> {
       displayName: name,
       role: DEMO_ROLES[id] ?? 'user',
       preferredLocale: 'id',
+      theme: 'system',
       level: 1,
       exp: 0,
       lastReviewDate: null,
@@ -83,4 +84,10 @@ export async function isDemoMode(): Promise<boolean> {
 export async function isSignupEnabled(): Promise<boolean> {
   const repo = await getRepository();
   return (await repo.getAppConfig()).signup.enabled;
+}
+
+/** Public password-reset gate (remote config boolean, toggled by a super admin). */
+export async function isResetPasswordEnabled(): Promise<boolean> {
+  const repo = await getRepository();
+  return (await repo.getAppConfig()).signup.resetPassword;
 }

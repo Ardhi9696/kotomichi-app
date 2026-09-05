@@ -33,7 +33,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-function applyTheme(mode: ThemeMode) {
+export function applyTheme(mode: ThemeMode) {
   document.cookie = `theme=${mode}; path=/; max-age=31536000; samesite=lax`;
   const dark = mode === 'dark' || (mode === 'system' && getSystemDark());
   document.documentElement.classList.toggle('dark', dark);

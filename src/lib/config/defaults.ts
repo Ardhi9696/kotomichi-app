@@ -18,7 +18,7 @@ export const DEFAULTS: AppConfig = {
   },
   deck: { masteryThreshold: 0.9 },
   fsrs: { weights: [...DEFAULT_W] },
-  signup: { enabled: true },
+  signup: { enabled: true, resetPassword: true },
 };
 
 export const DEFAULT_THRESHOLDS: Record<Direction, { fastThresholdMs: number; goodThresholdMs: number }> = {
@@ -82,6 +82,7 @@ export function assembleAppConfig(
     },
     signup: {
       enabled: bool('signup.enabled', DEFAULTS.signup.enabled),
+      resetPassword: bool('signup.reset_password', DEFAULTS.signup.resetPassword),
     },
   };
 }
@@ -101,5 +102,6 @@ export function flattenAppConfig(config: AppConfig): Array<{ key: string; valueJ
     { key: 'deck.mastery_threshold', valueJson: { value: config.deck.masteryThreshold } },
     { key: 'fsrs.weights', valueJson: { value: config.fsrs.weights } },
     { key: 'signup.enabled', valueJson: { value: config.signup.enabled } },
+    { key: 'signup.reset_password', valueJson: { value: config.signup.resetPassword } },
   ];
 }

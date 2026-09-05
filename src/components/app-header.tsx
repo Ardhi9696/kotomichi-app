@@ -7,10 +7,17 @@ import { useState } from 'react';
 
 import { signOutAction } from '@/app/actions/auth';
 import { ConfirmModal } from '@/components/confirm-modal';
-import { LocaleSwitcher } from '@/components/locale-switcher';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { SettingsDialog, type ProfileSettings } from '@/components/settings-dialog';
 
-export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
+export function AppHeader({
+  signedIn,
+  isAdmin,
+  profile,
+}: {
+  signedIn: boolean;
+  isAdmin: boolean;
+  profile: ProfileSettings | null;
+}) {
   const t = useTranslations();
   const pathname = usePathname();
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -45,7 +52,7 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-200/70 bg-washi-100/85 backdrop-blur dark:border-ink-800/70 dark:bg-ink-950/85">
+    <header className="sticky top-0 z-30 border-b border-ink-200/70 bg-washi-100/85 backdrop-blur dark:border-ink-800/70 dark:bg-ink-950">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4">
         <Link href="/" className="mr-3 flex items-baseline gap-1.5">
           <span className="font-serif text-lg font-bold tracking-tight text-ink-900 dark:text-washi-50">Kotomichi</span>
@@ -62,13 +69,11 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
               {link.label}
             </Link>
           ))}
+          {signedIn && profile && <SettingsDialog profile={profile} />}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1 md:ml-0">
-          <LocaleSwitcher />
-          <ThemeToggle />
-
-          <div className="hidden md:block">
+        <div className="ml-auto hidden items-center gap-1 md:flex">
+          <div>
             {signedIn ? (
               <button type="button" className="btn-ghost" onClick={() => setLogoutOpen(true)}>
                 {t('nav.logout')}
@@ -79,7 +84,9 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
               </Link>
             )}
           </div>
+        </div>
 
+        <div className="ml-auto md:hidden">
           <button
             type="button"
             className="btn-ghost p-2 md:hidden"
@@ -117,6 +124,7 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
                 {link.label}
               </Link>
             ))}
+            {signedIn && profile && <SettingsDialog profile={profile} />}
             <div className="mt-1 border-t border-ink-200/70 pt-2 dark:border-ink-800/70">
               {signedIn ? (
                 <button type="button" className="btn-ghost w-full justify-start" onClick={() => setLogoutOpen(true)}>

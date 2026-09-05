@@ -17,6 +17,7 @@ import type {
   Role,
   RoleChange,
   SrsProgress,
+  ThemeMode,
   UserProfile,
   Vocabulary,
   WordCard,
@@ -67,6 +68,7 @@ function toProfile(r: typeof userProfile.$inferSelect): UserProfile {
     displayName: r.displayName,
     role: r.role as Role,
     preferredLocale: r.preferredLocale,
+    theme: r.theme as ThemeMode,
     level: r.level,
     exp: r.exp,
     lastReviewDate: dayKey(r.lastReviewDate),
@@ -208,6 +210,7 @@ export class PostgresVocabRepo implements VocabRepository {
       displayName: p.displayName,
       role: p.role,
       preferredLocale: p.preferredLocale,
+      theme: p.theme,
       level: p.level,
       exp: p.exp,
       lastReviewDate: p.lastReviewDate,
@@ -217,12 +220,13 @@ export class PostgresVocabRepo implements VocabRepository {
   }
 
   async updateUserProfile(userId: string, patch: Partial<UserProfile>): Promise<UserProfile | null> {
-    const { displayName, preferredLocale, level, exp, lastReviewDate, currentStreak, longestStreak } = patch;
+    const { displayName, preferredLocale, theme, level, exp, lastReviewDate, currentStreak, longestStreak } = patch;
     const rows = await getDb()
       .update(userProfile)
       .set({
         ...(displayName !== undefined && { displayName }),
         ...(preferredLocale !== undefined && { preferredLocale }),
+        ...(theme !== undefined && { theme }),
         ...(level !== undefined && { level }),
         ...(exp !== undefined && { exp }),
         ...(lastReviewDate !== undefined && { lastReviewDate: lastReviewDate ?? null }),

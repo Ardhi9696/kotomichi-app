@@ -70,6 +70,7 @@ export async function signUpAction(_prev: ActionState, formData: FormData): Prom
     displayName,
     role: 'user',
     preferredLocale: 'en',
+    theme: 'system',
     level: 1,
     exp: 0,
     lastReviewDate: null,

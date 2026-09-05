@@ -194,6 +194,7 @@ export async function createUserAction(_prev: CreateUserState, formData: FormDat
     displayName,
     role,
     preferredLocale: 'en',
+    theme: 'system',
     level: 1,
     exp: 0,
     lastReviewDate: null,
@@ -221,15 +222,23 @@ export async function renameUserAction(_prev: RenameUserState, formData: FormDat
   return { ok: true };
 }
 
-export async function setConfigAction(formData: FormData): Promise<void> {
+export type ConfigSaveState = { error?: string; ok?: boolean };
+
+export async function setConfigAction(_prev: ConfigSaveState, formData: FormData): Promise<ConfigSaveState> {
   await requireRole('super_admin');
   const repo = await getRepository();
   const config = await repo.getAppConfig();
   const dailyNewCap = Number(formData.get('dailyNewCap'));
   const desiredRetention = Number(formData.get('desiredRetention'));
-  if (Number.isFinite(dailyNewCap) && dailyNewCap > 0) config.srs.dailyNewCap = Math.floor(dailyNewCap);
-  if (Number.isFinite(desiredRetention) && desiredRetention > 0 && desiredRetention < 1) config.srs.desiredRetention = desiredRetention;
+  if (!Number.isFinite(dailyNewCap) || dailyNewCap <= 0) return { error: 'invalidDailyNewCap' };
+  if (!Number.isFinite(desiredRetention) || desiredRetention <= 0 || desiredRetention >= 1) {
+    return { error: 'invalidDesiredRetention' };
+  }
+  config.srs.dailyNewCap = Math.floor(dailyNewCap);
+  config.srs.desiredRetention = desiredRetention;
   config.signup.enabled = formData.get('signupEnabled') === 'on';
+  config.signup.resetPassword = formData.get('resetPasswordEnabled') === 'on';
   await repo.setAppConfig(config);
   revalidatePath('/admin/settings');
+  return { ok: true };
 }
