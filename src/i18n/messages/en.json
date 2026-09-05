@@ -120,6 +120,7 @@
     "subtitle": "Choose your deck, review its vocabulary, then quiz yourself.",
     "deck": "Deck",
     "locked": "locked",
+    "quiz": "Quiz",
     "selfCheckTitle": "Self Check",
     "selfCheckDescription": "Flip each card and mark how well you knew it.",
     "quizTitle": "Quiz",

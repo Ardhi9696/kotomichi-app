@@ -83,8 +83,6 @@ export interface QuizQuestion {
   vocabularyId: number;
   /** Front text shown to the learner. */
   front: string;
-  /** Hiragana reading shown as hint under the front. */
-  hint: string | null;
   /** The 4 MC options (1 correct + 3 distractors). */
   options: QuizOption[];
   /** Which direction is being tested. */
