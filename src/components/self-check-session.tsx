@@ -5,26 +5,10 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 import { submitSelfCheckAction } from '@/app/actions/study';
-import type { PartOfSpeech, StudyCard } from '@/lib/domain';
+import { posLabel } from '@/lib/srs/pos-label';
+import type { StudyCard } from '@/lib/domain';
 
 const SWIPE_THRESHOLD = 64;
-
-function posLabel(t: ReturnType<typeof useTranslations<'learn'>>, pos: PartOfSpeech): string {
-  switch (pos) {
-    case 'noun':
-      return t('pos.noun');
-    case 'verb':
-      return t('pos.verb');
-    case 'adverb':
-      return t('pos.adverb');
-    case 'adjective':
-      return t('pos.adjective');
-    case 'conjunction':
-      return t('pos.conjunction');
-    case 'demonstrative':
-      return t('pos.demonstrative');
-  }
-}
 
 export function SelfCheckSession({
   cards: initialCards,

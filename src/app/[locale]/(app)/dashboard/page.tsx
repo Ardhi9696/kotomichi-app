@@ -5,40 +5,34 @@ import { getTranslations } from 'next-intl/server';
 import { getStudyContext } from '@/lib/server/dal';
 import { levelFromExp } from '@/lib/game/gamification';
 import { ActivityLabel } from '@/components/activity-label';
-import type { DeckStudyState } from '@/lib/srs/study-service';
+import { OverviewCalendar } from '@/components/overview-calendar';
+import { computeOverview } from '@/lib/stats/overview';
 import type { Role } from '@/lib/domain';
 
 export const metadata: Metadata = { title: 'Dashboard — Kotomichi' };
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ deck?: string }>;
-}) {
+const OVERVIEW_WINDOW_DAYS = 30;
+
+export default async function DashboardPage() {
   const t = await getTranslations('dashboard');
-  const { user, profile, repo, config, service } = await getStudyContext();
+  const to = await getTranslations('dashboard.overview');
+  const { user, profile, repo, config } = await getStudyContext();
 
   if (profile.role === 'admin' || profile.role === 'super_admin') {
     return <AdminOverview currentRole={profile.role} />;
   }
 
   const now = new Date().toISOString();
-  const locale = profile.preferredLocale;
 
-  const [dueCount, newToday, studySeconds, states, recent] = await Promise.all([
+  const [dueCount, newToday, studySeconds, activity, recent] = await Promise.all([
     repo.countDue(user.id, now),
     repo.countNewReviews(user.id, now.slice(0, 10) + 'T00:00:00.000Z'),
     repo.getStudySeconds(user.id, 1),
-    service.decksWithProgress(user.id, locale, now),
+    repo.getActivity(user.id, OVERVIEW_WINDOW_DAYS),
     repo.getRecentLogs(user.id, 8),
   ]);
 
-  const { deck } = await searchParams;
-  const selectedId = Number(deck);
-  const selected =
-    states.find((s) => s.deck.id === selectedId && !s.deck.isLocked) ??
-    states.find((s) => !s.deck.isLocked) ??
-    null;
+  const overview = computeOverview(activity, new Date(), OVERVIEW_WINDOW_DAYS);
 
   const lvl = levelFromExp(profile.exp, config.exp.base);
   const newRemaining = Math.max(0, config.srs.dailyNewCap - newToday);
@@ -57,32 +51,32 @@ export default async function DashboardPage({
         <Stat label={t('newToday')} value={String(newRemaining)} hint={`/ ${config.srs.dailyNewCap}`} />
       </section>
 
-      <section>
-        <div className="mb-3">
-          <h2 className="font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('selectDeck')}</h2>
-          <p className="text-sm text-ink-500 dark:text-ink-400">{t('selectDeckHint')}</p>
+      {/* Overview: calendar + consistency */}
+      <section className="card p-6">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{to('title')}</h2>
+            <p className="text-sm text-ink-500 dark:text-ink-400">{to('subtitle')}</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Metric value={String(overview.todayMinutes)} label={to('todayMinutes')} accent />
+            <Metric value={`${overview.currentStreak}`} label={to('currentStreak')} />
+            <Metric value={String(overview.daysThisMonth)} label={to('daysThisMonth')} />
+            <Metric value={String(overview.totalMinutes)} label={to('totalMinutes')} />
+          </div>
         </div>
-
-        <div className="flex flex-col gap-3">
-          {states.map((s) => (
-            <DeckPickerCard key={s.deck.id} s={s} selected={selected?.deck.id === s.deck.id} t={t} />
-          ))}
-        </div>
+        <OverviewCalendar monthCells={overview.monthCells} monthYear={overview.monthYear} />
       </section>
 
-      {selected && (
-        <section className="card flex flex-wrap items-center justify-between gap-4 p-6">
-          <div>
-            <h3 className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">{selected.deck.title}</h3>
-            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-              {selected.deck.subtitle}
-            </p>
-          </div>
-          <Link href={`/learn?deck=${selected.deck.id}`} className="btn-primary">
-            {t('checkAbility')} →
-          </Link>
-        </section>
-      )}
+      {/* Menu */}
+      <section>
+        <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('menu')}</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <MenuCard href="/learn" title={t('menuLearn')} description={t('menuLearnDescription')} icon="学" />
+          <MenuCard href="/review" title={t('menuReview')} description={t('menuReviewDescription')} icon="復" badge={dueCount > 0 ? String(dueCount) : undefined} />
+          <MenuCard href="/words" title={t('menuSearch')} description={t('menuSearchDescription')} icon="索" />
+        </div>
+      </section>
 
       {dueCount > 0 && (
         <Link href="/review" className="card group flex items-center justify-between px-5 py-4 transition-colors hover:border-kintsugi-500/50">
@@ -129,71 +123,53 @@ export default async function DashboardPage({
   );
 }
 
+function Metric({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border px-3 py-1.5 ${accent ? 'border-shu-500/40 bg-shu-500/5' : 'border-ink-200/70 dark:border-ink-800'}`}>
+      <span className={`mr-1.5 text-lg font-bold ${accent ? 'text-shu-500' : 'text-ink-800 dark:text-washi-50'}`}>{value}</span>
+      <span className="text-xs text-ink-500 dark:text-ink-400">{label}</span>
+    </div>
+  );
+}
+
+function MenuCard({
+  href,
+  title,
+  description,
+  icon,
+  badge,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  icon: string;
+  badge?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="card group flex flex-col items-start gap-3 p-5 transition-transform hover:-translate-y-0.5"
+    >
+      <div className="flex w-full items-center justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-shu-500/10 font-serif text-lg text-shu-500">
+          {icon}
+        </span>
+        {badge && (
+          <span className="chip bg-shu-500/10 text-shu-500">{badge}</span>
+        )}
+      </div>
+      <span className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">{title}</span>
+      <span className="text-sm text-ink-500 dark:text-ink-400">{description}</span>
+    </Link>
+  );
+}
+
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="card p-4">
       <p className="text-xs font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">{label}</p>
       <p className="mt-1 text-2xl font-bold text-ink-900 dark:text-washi-50">{value}</p>
       {hint ? <p className="text-xs text-ink-400 dark:text-ink-500">{hint}</p> : null}
-    </div>
-  );
-}
-
-function DeckPickerCard({
-  s,
-  selected,
-  t,
-}: {
-  s: DeckStudyState;
-  selected: boolean;
-  t: {
-    (key: string, values?: Record<string, string | number | Date>): string;
-  };
-}) {
-  const { deck } = s;
-  const pct = deck.mastery === null ? 0 : Math.round(deck.mastery * 100);
-  return (
-    <div
-      className={`card flex flex-wrap items-center justify-between gap-3 p-5 transition-colors ${
-        selected ? 'ring-2 ring-kintsugi-500/70' : ''
-      } ${deck.isLocked ? 'opacity-60' : ''}`}
-    >
-      <Link href={`/dashboard?deck=${deck.id}`} className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">
-            {deck.title}
-            {deck.subtitle && (
-              <span className="ml-2 font-sans text-xs font-medium text-ink-400">{deck.subtitle}</span>
-            )}
-          </h3>
-          {deck.isLocked && <span className="text-xs text-ink-400">🔒 {t('deckLocked')}</span>}
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
-          <span className="chip bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-            {deck.wordCount} {t('wordCount')}
-          </span>
-          <span className="chip bg-shu-500/10 text-shu-500">{deck.reviewedCount} {t('reviewedCount')}</span>
-          {deck.mastery !== null && <span className="chip bg-kintsugi-100 text-kintsugi-500">{pct}%</span>}
-          {selected && <span className="chip bg-emerald-500/10 text-emerald-600">{t('selected')}</span>}
-        </div>
-
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-ink-800">
-          <div className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500" style={{ width: `${pct}%` }} />
-        </div>
-      </Link>
-
-      <div className="flex shrink-0 flex-col items-end gap-2">
-        {selected ? (
-          <Link href={`/learn?deck=${deck.id}`} className="btn-primary">
-            {t('checkAbility')} →
-          </Link>
-        ) : (
-          <span className="text-xs text-ink-400">
-            {deck.isLocked ? t('deckLocked') : t('selectHint')}
-          </span>
-        )}
-      </div>
     </div>
   );
 }

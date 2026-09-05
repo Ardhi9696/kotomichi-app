@@ -38,6 +38,7 @@ export function AppHeader({
           { href: '/dashboard', label: t('nav.home') },
           { href: '/learn', label: t('nav.learn') },
           { href: '/review', label: t('nav.review') },
+          { href: '/words', label: t('nav.words') },
         ]
     : [];
 

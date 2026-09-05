@@ -235,3 +235,12 @@ export interface ActivityDay {
   reviews: number;
   seconds: number;
 }
+
+/** Result of submitting a single quiz answer (learn § quiz). */
+export type QuizAnswerResult = {
+  correct: boolean;
+  elapsedMs: number;
+  expGained: number;
+  nextStreak: number;
+  streakMilestone: boolean;
+} | { error: string };

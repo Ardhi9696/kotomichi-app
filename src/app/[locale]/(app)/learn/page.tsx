@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
-import { redirect } from 'next/navigation';
 
 import { requireLearner, getStudyContext } from '@/lib/server/dal';
-import { SelfCheckSession } from '@/components/self-check-session';
+import { LearnShell, type LearnDeckOption, type LearnWordRow } from '@/components/learn-shell';
 import { buildStudyCard } from '@/lib/srs/study-card';
 import { DIRECTIONS } from '@/lib/srs/directions';
+import { pickMeaning } from '@/lib/srs/meaning';
 
 export const metadata: Metadata = { title: 'Learn — Kotomichi' };
 
@@ -15,7 +14,6 @@ export default async function LearnPage({
   searchParams: Promise<{ deck?: string }>;
 }) {
   await requireLearner();
-  const t = await getTranslations('learn');
   const { deck } = await searchParams;
   const deckId = Number(deck);
 
@@ -24,10 +22,12 @@ export default async function LearnPage({
   const locale = profile.preferredLocale;
 
   const states = await service.decksWithProgress(user.id, locale, now);
-  const state = states.find((s) => s.deck.id === deckId);
-  if (!state || state.deck.isLocked) redirect('/dashboard');
+  const active =
+    states.find((s) => s.deck.id === deckId && !s.deck.isLocked) ??
+    states.find((s) => s.deck.isAvailable && !s.deck.isLocked);
+  if (!active) return null;
 
-  const words = await repo.getDeckWords(state.deck.id);
+  const words = await repo.getDeckWords(active.deck.id);
   const direction = 1 as const;
   const cards = words.map((w, i) =>
     buildStudyCard({
@@ -40,16 +40,34 @@ export default async function LearnPage({
     }),
   );
 
-  if (cards.length === 0) redirect('/dashboard');
+  const rows: LearnWordRow[] = words.map((w) => {
+    const ex = w.examples[0];
+    return {
+      id: w.vocabulary.id,
+      main: w.vocabulary.kanji ?? w.vocabulary.hiragana,
+      hiragana: w.vocabulary.hiragana,
+      romaji: w.vocabulary.romaji ?? null,
+      meaning: pickMeaning(w, locale),
+      partOfSpeech: w.vocabulary.partOfSpeech ?? null,
+      example: ex?.japanese ?? null,
+      exampleMeaning: ex?.translations.find((t) => t.locale === locale)?.translation ?? ex?.translations[0]?.translation ?? null,
+    };
+  });
+
+  const deckOptions: LearnDeckOption[] = states.map((s) => ({
+    id: s.deck.id,
+    title: s.deck.title,
+    isLocked: s.deck.isLocked,
+  }));
 
   return (
-    <div className="flex flex-col gap-6">
-      <section className="text-center">
-        <h1 className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('title')}</h1>
-        <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
-      </section>
-
-      <SelfCheckSession key={state.deck.id} cards={cards} deckTitle={state.deck.title} deckId={state.deck.id} />
-    </div>
+    <LearnShell
+      decks={deckOptions}
+      activeDeckId={active.deck.id}
+      deckTitle={active.deck.title}
+      wordCount={words.length}
+      words={rows}
+      cards={cards}
+    />
   );
 }
