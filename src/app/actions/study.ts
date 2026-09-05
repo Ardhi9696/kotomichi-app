@@ -35,3 +35,37 @@ export async function submitReviewAction(_prev: SubmitReviewState, formData: For
     return { error: e instanceof Error ? e.message : 'unknown' };
   }
 }
+
+export interface SubmitSelfCheckState {
+  ok?: boolean;
+  error?: string;
+}
+
+/** Subjective self-assessment: saves progress but awards no exp/streak. */
+export async function submitSelfCheckAction(
+  _prev: SubmitSelfCheckState,
+  formData: FormData,
+): Promise<SubmitSelfCheckState> {
+  const { profile } = await requireUser();
+  const ctx = await getStudyContext();
+
+  const vocabularyId = Number(formData.get('vocabularyId'));
+  const direction = Number(formData.get('direction')) as Direction;
+  const elapsedMs = Number(formData.get('elapsedMs') ?? 0);
+  const correct = formData.get('correct') === 'true';
+
+  if (!Number.isFinite(vocabularyId) || !Number.isFinite(elapsedMs)) {
+    return { error: 'invalid' };
+  }
+
+  try {
+    await ctx.service.submitSelfCheck(
+      profile,
+      { cardId: '', vocabularyId, direction, elapsedMs, correct, answer: String(formData.get('answer') ?? '') },
+      new Date().toISOString(),
+    );
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'unknown' };
+  }
+}

@@ -5,13 +5,17 @@ import { getTranslations } from 'next-intl/server';
 import { getStudyContext } from '@/lib/server/dal';
 import { levelFromExp } from '@/lib/game/gamification';
 import { ActivityLabel } from '@/components/activity-label';
-import type { DeckWithProgress, Role } from '@/lib/domain';
+import type { DeckStudyState } from '@/lib/srs/study-service';
+import type { Role } from '@/lib/domain';
 
 export const metadata: Metadata = { title: 'Dashboard — Kotomichi' };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deck?: string }>;
+}) {
   const t = await getTranslations('dashboard');
-  const lrn = await getTranslations('learn');
   const { user, profile, repo, config, service } = await getStudyContext();
 
   if (profile.role === 'admin' || profile.role === 'super_admin') {
@@ -29,13 +33,14 @@ export default async function DashboardPage() {
     repo.getRecentLogs(user.id, 8),
   ]);
 
-  const lvl = levelFromExp(profile.exp, config.exp.base);
-  const available = states.filter((s) => !s.deck.isLocked);
-  const firstNew = available.flatMap((s) => s.newCards.map((c) => ({ ...c, deckTitle: s.deck.title })))[0] ?? null;
-  const firstDue = (
-    available.flatMap((s) => (s.firstDue ? [{ ...s.firstDue, deckTitle: s.deck.title }] : [])) ?? []
-  ).sort((a, b) => (a.retrievability ?? 1) - (b.retrievability ?? 1))[0] ?? null;
+  const { deck } = await searchParams;
+  const selectedId = Number(deck);
+  const selected =
+    states.find((s) => s.deck.id === selectedId && !s.deck.isLocked) ??
+    states.find((s) => !s.deck.isLocked) ??
+    null;
 
+  const lvl = levelFromExp(profile.exp, config.exp.base);
   const newRemaining = Math.max(0, config.srs.dailyNewCap - newToday);
 
   return (
@@ -52,52 +57,41 @@ export default async function DashboardPage() {
         <Stat label={t('newToday')} value={String(newRemaining)} hint={`/ ${config.srs.dailyNewCap}`} />
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <Link href="/learn" className="card group p-6 transition-transform hover:-translate-y-0.5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-shu-500">{t('continueLearn')}</p>
-          {firstNew ? (
-            <>
-              <p className="mt-2 font-serif text-lg text-ink-900 dark:text-washi-50">{firstNew.kanji ?? firstNew.hiragana}</p>
-              <p className="text-sm text-ink-500 dark:text-ink-400">
-                {firstNew.hiragana} · {firstNew.meanings[0]} · {firstNew.deckTitle}
-              </p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">{lrn('sessionDone')}</p>
-          )}
-        </Link>
-
-        <Link href="/review" className="card group p-6 transition-transform hover:-translate-y-0.5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-shu-500">{t('startReview')}</p>
-          {firstDue ? (
-            <>
-              <p className="mt-2 font-serif text-lg text-ink-900 dark:text-washi-50">
-                {firstDue.kanji ?? firstDue.hiragana} · {firstDue.to}
-              </p>
-              <p className="text-sm text-ink-500 dark:text-ink-400">
-                {dueCount} {t('wordCount')} · {firstDue.deckTitle}
-              </p>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">{dueCount === 0 ? lrn('noCards') : t('noActivity')}</p>
-          )}
-        </Link>
-      </section>
-
       <section>
-        <h2 className="mb-2 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('continueLearn')}</h2>
+        <div className="mb-3">
+          <h2 className="font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('selectDeck')}</h2>
+          <p className="text-sm text-ink-500 dark:text-ink-400">{t('selectDeckHint')}</p>
+        </div>
+
         <div className="flex flex-col gap-3">
-          {states.map(({ deck, newCards, firstDue: d }) => (
-            <DeckRow
-              key={deck.id}
-              deck={deck}
-              newCount={newCards.length}
-              dueHint={d ? `${d.kanji ?? d.hiragana}` : null}
-              labels={{ word: t('wordCount'), reviewed: t('reviewedCount'), new: t('newCount'), due: t('dueCount') }}
-            />
+          {states.map((s) => (
+            <DeckPickerCard key={s.deck.id} s={s} selected={selected?.deck.id === s.deck.id} t={t} />
           ))}
         </div>
       </section>
+
+      {selected && (
+        <section className="card flex flex-wrap items-center justify-between gap-4 p-6">
+          <div>
+            <h3 className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">{selected.deck.title}</h3>
+            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+              {selected.deck.subtitle}
+            </p>
+          </div>
+          <Link href={`/learn?deck=${selected.deck.id}`} className="btn-primary">
+            {t('checkAbility')} →
+          </Link>
+        </section>
+      )}
+
+      {dueCount > 0 && (
+        <Link href="/review" className="card group flex items-center justify-between px-5 py-4 transition-colors hover:border-kintsugi-500/50">
+          <span className="text-sm text-ink-700 dark:text-ink-200">
+            {t('dueStrip', { count: dueCount })}
+          </span>
+          <span className="text-sm font-medium text-shu-500">{t('startReview')} →</span>
+        </Link>
+      )}
 
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="card p-6">
@@ -145,43 +139,60 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
-function DeckRow({ deck, newCount, dueHint, labels }: { deck: DeckWithProgress; newCount: number; dueHint: string | null; labels: { word: string; reviewed: string; new: string; due: string } }) {
+function DeckPickerCard({
+  s,
+  selected,
+  t,
+}: {
+  s: DeckStudyState;
+  selected: boolean;
+  t: {
+    (key: string, values?: Record<string, string | number | Date>): string;
+  };
+}) {
+  const { deck } = s;
   const pct = deck.mastery === null ? 0 : Math.round(deck.mastery * 100);
   return (
-    <div className={`card p-5 ${deck.isLocked ? 'opacity-60' : ''}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+    <div
+      className={`card flex flex-wrap items-center justify-between gap-3 p-5 transition-colors ${
+        selected ? 'ring-2 ring-kintsugi-500/70' : ''
+      } ${deck.isLocked ? 'opacity-60' : ''}`}
+    >
+      <Link href={`/dashboard?deck=${deck.id}`} className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">
             {deck.title}
-            {deck.subtitle && <span className="ml-2 font-sans text-xs font-medium text-ink-400">{deck.subtitle}</span>}
+            {deck.subtitle && (
+              <span className="ml-2 font-sans text-xs font-medium text-ink-400">{deck.subtitle}</span>
+            )}
           </h3>
+          {deck.isLocked && <span className="text-xs text-ink-400">🔒 {t('deckLocked')}</span>}
         </div>
-        <div className="flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
           <span className="chip bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-            {deck.wordCount} {labels.word}
+            {deck.wordCount} {t('wordCount')}
           </span>
-          <span className="chip bg-shu-500/10 text-shu-500">{deck.reviewedCount} {labels.reviewed}</span>
+          <span className="chip bg-shu-500/10 text-shu-500">{deck.reviewedCount} {t('reviewedCount')}</span>
           {deck.mastery !== null && <span className="chip bg-kintsugi-100 text-kintsugi-500">{pct}%</span>}
-          {deck.isLocked && <span>🔒</span>}
+          {selected && <span className="chip bg-emerald-500/10 text-emerald-600">{t('selected')}</span>}
         </div>
-      </div>
 
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-ink-800">
-        <div className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500" style={{ width: `${pct}%` }} />
-      </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-ink-800">
+          <div className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500" style={{ width: `${pct}%` }} />
+        </div>
+      </Link>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        {newCount > 0 && (
-          <Link href="/learn" className="font-medium text-shu-500 hover:underline">
-            {newCount} {labels.new} →
+      <div className="flex shrink-0 flex-col items-end gap-2">
+        {selected ? (
+          <Link href={`/learn?deck=${deck.id}`} className="btn-primary">
+            {t('checkAbility')} →
           </Link>
+        ) : (
+          <span className="text-xs text-ink-400">
+            {deck.isLocked ? t('deckLocked') : t('selectHint')}
+          </span>
         )}
-        {dueHint && (
-          <Link href="/review" className="font-medium text-ink-600 hover:text-shu-500 dark:text-ink-300">
-            {deck.dueCount} {labels.due} · {dueHint}
-          </Link>
-        )}
-        {newCount === 0 && !dueHint && <span className="text-ink-400">✓</span>}
       </div>
     </div>
   );

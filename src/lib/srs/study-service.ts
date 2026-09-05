@@ -265,6 +265,101 @@ export class StudyService {
   }
 
   // ------------------------------------------------------------------
+  // Self-check ("Cek Kemampuan") — subjective flashcard assessment (§ self-check)
+  // ------------------------------------------------------------------
+
+  /**
+   * Records a subjective self-assessment for a word: SRS state and review log
+   * are updated exactly like a normal review, but NO exp/streak is awarded —
+   * the judgment is the user's own opinion, not an objective FSRS signal.
+   */
+  async submitSelfCheck(
+    user: UserProfile,
+    submission: ReviewSubmission,
+    now: string,
+  ): Promise<ReviewOutcome> {
+    const { vocabularyId, direction, elapsedMs, correct } = submission;
+    const threshold = this.thresholds[safeDirection(direction)];
+    if (!threshold) throw new Error(`No thresholds for direction ${direction}`);
+
+    const rating = ratingFromAnswer(correct, elapsedMs, threshold.fastThresholdMs, threshold.goodThresholdMs);
+    const prev = await this.repo.getProgress(user.id, vocabularyId, direction);
+    const word = await this.repo.getVocabularyById(vocabularyId);
+    if (!word) throw new Error(`Vocabulary ${vocabularyId} not found`);
+
+    const prevNonNull = Boolean(prev && prev.stability > 0);
+    const prevState = prevNonNull && prev
+      ? { stability: prev.stability, difficulty: prev.difficulty }
+      : null;
+    const elapsedDays = prevState && prev
+      ? daysBetween(now, prev.lastReviewAt ?? prev.dueAt)
+      : 0;
+
+    const upd = updateState(prevState, elapsedDays, rating, {
+      w: this.config.fsrs.weights,
+      desiredRetention: this.config.srs.desiredRetention,
+      maxIntervalDays: this.config.srs.maxIntervalDays,
+    });
+
+    const isNew = prevState === null;
+    const reviewCount = (prev?.reviewCount ?? 0) + 1;
+    const lapses = (prev?.lapses ?? 0) + (rating === 1 ? 1 : 0);
+    const dueAt = new Date(new Date(now).getTime() + upd.intervalDays * DAY_MS).toISOString();
+
+    await this.repo.applyReview({
+      userId: user.id,
+      log: {
+        vocabularyId,
+        direction,
+        isNew,
+        correctness: correct,
+        elapsedMs,
+        rating,
+        stabilityBefore: prev?.stability ?? null,
+        stabilityAfter: upd.state.stability,
+        difficultyBefore: prev?.difficulty ?? null,
+        difficultyAfter: upd.state.difficulty,
+        retrievabilityBefore: prev ? upd.retrievabilityBefore : null,
+      },
+      progress: {
+        vocabularyId,
+        direction,
+        stability: upd.state.stability,
+        difficulty: upd.state.difficulty,
+        retrievability: prev ? upd.retrievabilityBefore : 1,
+        dueAt,
+        lastReviewAt: now,
+        reviewCount,
+        lapses,
+      },
+      // Stats are left untouched — self-assessment earns no exp/streak.
+      userStats: {
+        exp: user.exp,
+        level: user.level,
+        currentStreak: user.currentStreak,
+        longestStreak: user.longestStreak,
+        lastReviewDate: user.lastReviewDate ?? now.slice(0, 10),
+      },
+    });
+
+    return {
+      vocabularyId,
+      direction,
+      correct,
+      elapsedMs,
+      rating,
+      stability: upd.state.stability,
+      difficulty: upd.state.difficulty,
+      intervalDays: Math.ceil(upd.intervalDays),
+      expGained: 0,
+      nextStreak: user.currentStreak,
+      streakMilestone: false,
+      dueCountRemaining: 0,
+      newCountRemaining: 0,
+    };
+  }
+
+  // ------------------------------------------------------------------
   // Dashboard / deck gating (§4.9)
   // ------------------------------------------------------------------
 

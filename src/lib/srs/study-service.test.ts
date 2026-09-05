@@ -94,4 +94,30 @@ describe('StudyService', () => {
     expect(states[0].deck.isAvailable).toBe(true);
     expect(states[0].deck.wordCount).toBeGreaterThan(0);
   });
+
+  it('saves self-check progress but awards no exp or streak', async () => {
+    const { repo, service } = await svc();
+    const profile = { ...USER, exp: 120, level: 3, currentStreak: 2, longestStreak: 4, lastReviewDate: '2026-09-04' };
+
+    const outcome = await service.submitSelfCheck(
+      profile,
+      { cardId: '', vocabularyId: 2, direction: 1, elapsedMs: 5000, correct: true, answer: '' },
+      NOW,
+    );
+
+    expect(outcome.expGained).toBe(0);
+    expect(outcome.rating).toBe(4);
+    expect(outcome.intervalDays).toBeGreaterThan(0);
+
+    const stored = await repo.getUserProfile(profile.id);
+    expect(stored?.exp).toBe(120);
+    expect(stored?.level).toBe(3);
+    expect(stored?.currentStreak).toBe(2);
+    expect(stored?.longestStreak).toBe(4);
+    expect(stored?.lastReviewDate).toBe('2026-09-04');
+
+    // progress is recorded: the word no longer counts as brand-new (counts as reviewed)
+    const q = await service.buildQueue(profile.id, 101, { now: NOW, locale: 'id', limit: 10 });
+    expect(q.newCards.some((c) => c.vocabularyId === 2)).toBe(false);
+  });
 });
