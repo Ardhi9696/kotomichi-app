@@ -89,6 +89,90 @@ export async function submitQuizAnswerAction(
   }
 }
 
+export interface QuizAnswerInput {
+  vocabularyId: number;
+  direction: number;
+  elapsedMs: number;
+  correct: boolean;
+  answer: string;
+}
+
+export interface QuizAnswerOutput {
+  vocabularyId: number;
+  direction: number;
+  correct: boolean;
+  elapsedMs: number;
+  expGained: number;
+}
+
+export interface SubmitQuizSessionState {
+  ok?: boolean;
+  results?: QuizAnswerOutput[];
+  totalExp?: number;
+  error?: string;
+}
+
+/**
+ * Submit an entire quiz session at once (batch mode).
+ * This is much faster than submitting each answer individually.
+ */
+export async function submitQuizSessionAction(
+  _prev: SubmitQuizSessionState,
+  formData: FormData,
+): Promise<SubmitQuizSessionState> {
+  const { profile } = await requireUser();
+  const ctx = await getStudyContext();
+
+  const answersJson = formData.get('answers');
+  if (!answersJson || typeof answersJson !== 'string') {
+    return { error: 'missing_answers' };
+  }
+
+  let answers: QuizAnswerInput[];
+  try {
+    answers = JSON.parse(answersJson);
+  } catch {
+    return { error: 'invalid_json' };
+  }
+
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return { error: 'empty_answers' };
+  }
+
+  const results: QuizAnswerOutput[] = [];
+  let totalExp = 0;
+  const now = new Date().toISOString();
+
+  try {
+    for (const a of answers) {
+      const result = await ctx.service.submit(
+        profile,
+        {
+          cardId: `quiz:${a.vocabularyId}:${a.direction}`,
+          vocabularyId: a.vocabularyId,
+          direction: a.direction as Direction,
+          elapsedMs: a.elapsedMs,
+          correct: a.correct,
+          answer: a.answer,
+        },
+        now,
+        profile.preferredLocale,
+      );
+      results.push({
+        vocabularyId: a.vocabularyId,
+        direction: a.direction,
+        correct: a.correct,
+        elapsedMs: a.elapsedMs,
+        expGained: result.outcome.expGained,
+      });
+      totalExp += result.outcome.expGained;
+    }
+    return { ok: true, results, totalExp };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'unknown' };
+  }
+}
+
 /** Subjective self-assessment: saves progress but awards no exp/streak. */
 export async function submitSelfCheckAction(
   _prev: SubmitSelfCheckState,

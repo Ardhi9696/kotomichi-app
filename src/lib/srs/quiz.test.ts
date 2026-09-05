@@ -81,7 +81,6 @@ describe('buildQuizSession (6-direction drills)', () => {
     const d1 = byDir(1); // Kanji → Arti
     expect(d1.front).toBe(w.vocabulary.kanji);
     expect(d1.options.find((o) => o.correct)!.text).toBe(w.translations.id);
-    expect(d1.hint).toBe(w.vocabulary.hiragana);
 
     const d2 = byDir(2); // Kanji → Hiragana
     expect(d2.front).toBe(w.vocabulary.kanji);
@@ -90,7 +89,6 @@ describe('buildQuizSession (6-direction drills)', () => {
     const d3 = byDir(3); // Hiragana → Arti
     expect(d3.front).toBe(w.vocabulary.hiragana);
     expect(d3.options.find((o) => o.correct)!.text).toBe(w.translations.id);
-    expect(d3.hint).toBeUndefined();
   });
 
   it('front/correct values match each hard direction', () => {
@@ -101,7 +99,6 @@ describe('buildQuizSession (6-direction drills)', () => {
     const d4 = byDir(4); // Arti → Hiragana
     expect(d4.front).toBe(w.translations.id);
     expect(d4.options.find((o) => o.correct)!.text).toBe(w.vocabulary.hiragana);
-    expect(d4.hint).toBeUndefined();
 
     const d5 = byDir(5); // Hiragana → Kanji
     expect(d5.front).toBe(w.vocabulary.hiragana);

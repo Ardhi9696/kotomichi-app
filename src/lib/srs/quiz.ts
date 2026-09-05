@@ -89,8 +89,6 @@ export interface QuizQuestion {
   directionId: number;
   /** Human-readable label for the direction. */
   directionLabel: QuizDirectionLabel;
-  /** Optional hint for the question (e.g., hiragana reading for kanji). */
-  hint?: string;
 }
 
 // ------------------------------------------------------------------
@@ -128,12 +126,6 @@ function directionLabel(dir: QuizDirectionDef): QuizDirectionLabel {
 function distractorKind(dir: QuizDirectionDef): 'kanji' | 'hiragana' | 'meaning' {
   if (dir.labelKey.endsWith('ToKanji')) return 'kanji';
   if (dir.labelKey.endsWith('ToHiragana')) return 'hiragana';
-  return 'meaning';
-}
-
-function frontKind(dir: QuizDirectionDef): 'kanji' | 'hiragana' | 'meaning' {
-  if (dir.labelKey.startsWith('dir.kanji')) return 'kanji';
-  if (dir.labelKey.startsWith('dir.hiragana')) return 'hiragana';
   return 'meaning';
 }
 
@@ -202,13 +194,9 @@ export function buildQuizSession(
         ...distractors.map((text) => ({ text, correct: false })),
       ]);
 
-      // Show hiragana hint when front is kanji; no hint otherwise.
-      const hint = frontKind(dir) === 'kanji' ? word.vocabulary.hiragana : undefined;
-
       questions.push({
         vocabularyId: word.vocabulary.id,
         front: frontValue,
-        hint,
         options,
         directionId: dir.id,
         directionLabel: directionLabel(dir),

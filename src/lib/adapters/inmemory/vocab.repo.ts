@@ -10,6 +10,11 @@ import type {
   Deck,
   DirectionThreshold,
   JlptLevel,
+  QuizAnswerInput,
+  QuizMode,
+  QuizSession,
+  QuizSessionAnswer,
+  QuizSessionVocabDetail,
   ReviewLog,
   Role,
   RoleChange,
@@ -51,6 +56,10 @@ export class InMemoryVocabRepo implements VocabRepository {
   private nextCollocId: number;
   private nextLogId: number;
   private nextDeckId: number;
+  private quizSessions = new Map<number, QuizSession>();
+  private quizSessionAnswers = new Map<number, QuizSessionAnswer[]>();
+  private quizSessionVocabDetails = new Map<number, QuizSessionVocabDetail[]>();
+  private nextQuizSessionId = 1;
 
   constructor() {
     const { words, decks, deckMembership } = buildSeedDocs();
@@ -511,5 +520,127 @@ export class InMemoryVocabRepo implements VocabRepository {
       total += Math.min(l.elapsedMs, 30000) / 1000;
     }
     return Math.round(total);
+  }
+
+  // ================= quiz sessions =================
+  async createQuizSession(userId: string, deckId: number, mode: QuizMode, totalSessions: number, sessionIndex: number = 0): Promise<QuizSession> {
+    // Check if session already exists for this sessionIndex
+    for (const session of this.quizSessions.values()) {
+      if (session.userId === userId && session.deckId === deckId && session.mode === mode && session.sessionIndex === sessionIndex) {
+        return { ...session };
+      }
+    }
+    const now = new Date().toISOString();
+    const session: QuizSession = {
+      id: this.nextQuizSessionId++,
+      userId,
+      deckId,
+      mode,
+      sessionIndex,
+      totalSessions,
+      status: 'in_progress',
+      startedAt: now,
+      completedAt: null,
+      syncedAt: null,
+      totalQuestions: 0,
+      correctCount: 0,
+      totalExp: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.quizSessions.set(session.id, session);
+    return { ...session };
+  }
+
+  async getQuizSession(userId: string, deckId: number, mode: QuizMode, sessionIndex: number): Promise<QuizSession | null> {
+    for (const session of this.quizSessions.values()) {
+      if (session.userId === userId && session.deckId === deckId && session.mode === mode && session.sessionIndex === sessionIndex) {
+        return { ...session };
+      }
+    }
+    return null;
+  }
+
+  async getQuizSessions(userId: string, deckId: number, mode: QuizMode): Promise<QuizSession[]> {
+    return [...this.quizSessions.values()]
+      .filter(s => s.userId === userId && s.deckId === deckId && s.mode === mode)
+      .sort((a, b) => a.sessionIndex - b.sessionIndex)
+      .map(s => ({ ...s }));
+  }
+
+  async addQuizSessionAnswers(sessionId: number, answers: QuizAnswerInput[]): Promise<QuizSessionAnswer[]> {
+    const sessionAnswers = this.quizSessionAnswers.get(sessionId) ?? [];
+    const newAnswers: QuizSessionAnswer[] = answers.map((a, i) => ({
+      id: sessionAnswers.length + i + 1,
+      sessionId,
+      vocabularyId: a.vocabularyId,
+      direction: a.direction,
+      elapsedMs: a.elapsedMs,
+      correct: a.correct,
+      answerText: a.answer,
+      speedCategory: this.getSpeedCategory(a.elapsedMs),
+      expGained: a.correct ? 10 : 0, // simplified
+      submittedAt: new Date().toISOString(),
+      synced: false,
+    }));
+    this.quizSessionAnswers.set(sessionId, [...sessionAnswers, ...newAnswers]);
+    return newAnswers;
+  }
+
+  private getSpeedCategory(elapsedMs: number): 'easy' | 'good' | 'hard' {
+    if (elapsedMs <= 8000) return 'easy';
+    if (elapsedMs <= 15000) return 'good';
+    return 'hard';
+  }
+
+  async upsertQuizSessionVocabDetails(sessionId: number, details: Omit<QuizSessionVocabDetail, 'id' | 'sessionId' | 'createdAt' | 'updatedAt'>[]): Promise<void> {
+    const existing = this.quizSessionVocabDetails.get(sessionId) ?? [];
+    const detailMap = new Map(existing.map(d => [d.vocabularyId, d]));
+    for (const detail of details) {
+      detailMap.set(detail.vocabularyId, { ...detail, id: 0, sessionId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as QuizSessionVocabDetail);
+    }
+    this.quizSessionVocabDetails.set(sessionId, [...detailMap.values()]);
+  }
+
+  async completeQuizSession(sessionId: number, correctCount: number, totalExp: number): Promise<void> {
+    const session = this.quizSessions.get(sessionId);
+    if (session) {
+      this.quizSessions.set(sessionId, {
+        ...session,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        correctCount,
+        totalExp,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  async markQuizSessionSynced(sessionId: number): Promise<void> {
+    const session = this.quizSessions.get(sessionId);
+    if (session) {
+      this.quizSessions.set(sessionId, {
+        ...session,
+        status: 'synced',
+        syncedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    // Also mark answers as synced
+    const answers = this.quizSessionAnswers.get(sessionId);
+    if (answers) {
+      this.quizSessionAnswers.set(sessionId, answers.map(a => ({ ...a, synced: true })));
+    }
+  }
+
+  async getQuizSessionVocabDetails(sessionId: number): Promise<QuizSessionVocabDetail[]> {
+    return [...(this.quizSessionVocabDetails.get(sessionId) ?? [])];
+  }
+
+  async getLatestInProgressQuizSession(userId: string, deckId: number, mode: QuizMode): Promise<QuizSession | null> {
+    const sessions = [...this.quizSessions.values()]
+      .filter(s => s.userId === userId && s.deckId === deckId && s.mode === mode && s.status === 'in_progress')
+      .sort((a, b) => b.sessionIndex - a.sessionIndex);
+    return sessions[0] ? { ...sessions[0] } : null;
   }
 }

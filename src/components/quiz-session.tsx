@@ -4,24 +4,47 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
-import { submitQuizAnswerAction } from '@/app/actions/study';
+import { submitQuizSessionAction, type QuizAnswerOutput } from '@/app/actions/study';
 import { speedForElapsed, type AnswerSpeed, type QuizMode, type QuizQuestion } from '@/lib/srs/quiz';
-import type { QuizAnswerResult } from '@/lib/domain';
 
-interface AnsweredQuestion {
+interface PendingAnswer {
   question: QuizQuestion;
   correct: boolean;
   elapsedMs: number;
-  speed: AnswerSpeed;
-  expGained: number;
+  answer: string;
 }
 
-const AUTO_NEXT_DELAY_MS = 900;
+interface AnsweredQuestion {
+  question: QuizQuestion;
+  result: QuizAnswerOutput;
+  speed: AnswerSpeed;
+}
 
-const SPEED_LABELS: Record<AnswerSpeed, { labelKey: 'easyLabel' | 'goodLabel' | 'hardLabel'; className: string }> = {
-  easy: { labelKey: 'easyLabel', className: 'text-emerald-600 dark:text-emerald-400' },
-  good: { labelKey: 'goodLabel', className: 'text-kintsugi-600 dark:text-kintsugi-400' },
-  hard: { labelKey: 'hardLabel', className: 'text-shu-600 dark:text-shu-400' },
+interface SessionAnswerDetail {
+  vocabularyId: number;
+  front: string;
+  directions: {
+    dir: number;
+    elapsedMs: number;
+    correct: boolean;
+    speed: AnswerSpeed;
+    expGained: number;
+  }[];
+}
+
+const SPEED_LABELS: Record<AnswerSpeed, { labelKey: 'easyLabel' | 'goodLabel' | 'hardLabel'; className: string; badgeClass: string }> = {
+  easy: { labelKey: 'easyLabel', className: 'text-emerald-600 dark:text-emerald-400', badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400' },
+  good: { labelKey: 'goodLabel', className: 'text-kintsugi-600 dark:text-kintsugi-400', badgeClass: 'bg-kintsugi-500/10 text-kintsugi-600 dark:bg-kintsugi-500/20 dark:text-kintsugi-400' },
+  hard: { labelKey: 'hardLabel', className: 'text-shu-600 dark:text-shu-400', badgeClass: 'bg-shu-500/10 text-shu-600 dark:bg-shu-500/20 dark:text-shu-400' },
+};
+
+const DIRECTION_NAMES: Record<number, string> = {
+  1: 'Kanji → Arti',
+  2: 'Kanji → Hiragana',
+  3: 'Hiragana → Arti',
+  4: 'Arti → Hiragana',
+  5: 'Hiragana → Kanji',
+  6: 'Arti → Kanji',
 };
 
 export function QuizSession({
@@ -29,11 +52,17 @@ export function QuizSession({
   deckId,
   deckTitle,
   mode,
+  sessionIndex = 0,
+  totalSessions = 1,
+  sessionId,
 }: {
   questions: QuizQuestion[];
   deckId: number;
   deckTitle: string;
   mode: QuizMode;
+  sessionIndex?: number;
+  totalSessions?: number;
+  sessionId?: number;
 }) {
   const t = useTranslations('quiz');
   const common = useTranslations('common');
@@ -42,93 +71,202 @@ export function QuizSession({
   const [questions] = useState<QuizQuestion[]>(initialQuestions);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
-  const [result, setResult] = useState<QuizAnswerResult | null>(null);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pendingAnswers, setPendingAnswers] = useState<PendingAnswer[]>([]);
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionComplete, setSessionComplete] = useState(false);
   const shownAt = useRef<number>(0);
 
   const question = questions[index];
   const total = questions.length;
   const done = index >= total;
 
-  useEffect(() => {
+useEffect(() => {
     shownAt.current = Date.now();
   }, [index, done]);
 
-  const resetToState = () => {
-    setPicked(null);
-    setResult(null);
-    setError(null);
-    setPending(false);
-    setIndex((i) => i + 1);
-  };
-
   const choose = (optionText: string) => {
-    if (!question || pending || picked) return;
+    if (!question || picked) return;
     // eslint-disable-next-line react-hooks/purity -- event handler, not render
     const elapsedMs = Math.max(0, Date.now() - shownAt.current);
     const correct = question.options.find((o) => o.text === optionText)?.correct ?? false;
     setPicked(optionText);
 
-    const fd = new FormData();
-    fd.set('vocabularyId', String(question.vocabularyId));
-    fd.set('direction', String(question.directionId));
-    fd.set('elapsedMs', String(elapsedMs));
-    fd.set('correct', String(correct));
-    fd.set('answer', optionText);
-
-    setPending(true);
-    setError(null);
-    void submitQuizAnswerAction(null, fd).then((res) => {
-      setPending(false);
-      if ('error' in res) {
-        setError(common('error'));
-        setPicked(null);
-        return;
+    // Store answer locally and trigger background sync
+    setPendingAnswers((prev) => {
+      const newPending = [...prev, { question, correct, elapsedMs, answer: optionText }];
+      // Trigger background sync after state update
+      if (newPending.length >= 3 && !submitting && !syncing && sessionId) {
+        // Use setTimeout to avoid setState in effect
+        setTimeout(() => {
+          if (!submitting && !syncing && sessionId) {
+            setSyncing(true);
+            const fd = new FormData();
+            fd.set('answers', JSON.stringify(newPending.map(a => ({
+              vocabularyId: a.question.vocabularyId,
+              direction: a.question.directionId,
+              elapsedMs: a.elapsedMs,
+              correct: a.correct,
+              answer: a.answer,
+            }))));
+            fd.set('sessionId', String(sessionId));
+            
+            submitQuizSessionAction({}, fd).then((res) => {
+              setSyncing(false);
+              if (!res.error && res.results) {
+                const newAnswered = newPending.map((a, i) => ({
+                  question: a.question,
+                  result: res.results![i],
+                  speed: speedForElapsed(a.elapsedMs),
+                }));
+                setAnswered(prev => [...prev, ...newAnswered]);
+                setPendingAnswers(prev => prev.slice(newPending.length));
+              }
+            }).catch(() => {
+              setSyncing(false);
+            });
+          }
+        }, 0);
       }
-      setResult(res);
-      setAnswered((prev) => [
-        ...prev,
-        { question, correct: res.correct, elapsedMs: res.elapsedMs, speed: speedForElapsed(res.elapsedMs), expGained: res.expGained },
-      ]);
-      if (res.correct) {
-        window.setTimeout(resetToState, AUTO_NEXT_DELAY_MS);
-      }
+      return newPending;
     });
+
+    // Auto-advance for correct answers
+    if (correct) {
+      window.setTimeout(() => {
+        setPicked(null);
+        setIndex((i) => i + 1);
+      }, 900);
+    }
   };
 
-  // ----- Summary screen -----
-  if (done) {
-    const correctCount = answered.filter((a) => a.correct).length;
-    const expGained = answered.reduce((sum, a) => sum + a.expGained, 0);
+  const nextQuestion = () => {
+    setPicked(null);
+    setIndex((i) => i + 1);
+  };
+
+  // Submit remaining answers when session is done
+  const submitRemaining = async () => {
+    if (pendingAnswers.length === 0) return;
+    
+    setSubmitting(true);
+    setError(null);
+
+    const fd = new FormData();
+    fd.set('answers', JSON.stringify(pendingAnswers.map(a => ({
+      vocabularyId: a.question.vocabularyId,
+      direction: a.question.directionId,
+      elapsedMs: a.elapsedMs,
+      correct: a.correct,
+      answer: a.answer,
+    }))));
+    if (sessionId) fd.set('sessionId', String(sessionId));
+
+    try {
+      const res = await submitQuizSessionAction({}, fd);
+      setSubmitting(false);
+      if (res.error) {
+        setError(common('error'));
+        return;
+      }
+      if (res.results) {
+        const newAnswered = pendingAnswers.map((a, i) => ({
+          question: a.question,
+          result: res.results![i],
+          speed: speedForElapsed(a.elapsedMs),
+        }));
+        setAnswered(prev => [...prev, ...newAnswered]);
+        setPendingAnswers([]);
+        setSessionComplete(true);
+      }
+    } catch {
+      setSubmitting(false);
+      setError(common('error'));
+    }
+  };
+
+  // Also submit vocab details to server for persistence
+  useEffect(() => {
+    if (sessionComplete && sessionId && answered.length > 0) {
+      const vocabDetails = buildVocabDetails();
+      const detailPayload = vocabDetails.map(v => ({
+        sessionId,
+        vocabularyId: v.vocabularyId,
+        dir1ElapsedMs: v.directions.find(d => d.dir === 1)?.elapsedMs ?? null,
+        dir1Correct: v.directions.find(d => d.dir === 1)?.correct ?? null,
+        dir1Speed: v.directions.find(d => d.dir === 1)?.speed ?? null,
+        dir1Exp: v.directions.find(d => d.dir === 1)?.expGained ?? 0,
+        dir2ElapsedMs: v.directions.find(d => d.dir === 2)?.elapsedMs ?? null,
+        dir2Correct: v.directions.find(d => d.dir === 2)?.correct ?? null,
+        dir2Speed: v.directions.find(d => d.dir === 2)?.speed ?? null,
+        dir2Exp: v.directions.find(d => d.dir === 2)?.expGained ?? 0,
+        dir3ElapsedMs: v.directions.find(d => d.dir === 3)?.elapsedMs ?? null,
+        dir3Correct: v.directions.find(d => d.dir === 3)?.correct ?? null,
+        dir3Speed: v.directions.find(d => d.dir === 3)?.speed ?? null,
+        dir3Exp: v.directions.find(d => d.dir === 3)?.expGained ?? 0,
+        dir4ElapsedMs: v.directions.find(d => d.dir === 4)?.elapsedMs ?? null,
+        dir4Correct: v.directions.find(d => d.dir === 4)?.correct ?? null,
+        dir4Speed: v.directions.find(d => d.dir === 4)?.speed ?? null,
+        dir4Exp: v.directions.find(d => d.dir === 4)?.expGained ?? 0,
+        dir5ElapsedMs: v.directions.find(d => d.dir === 5)?.elapsedMs ?? null,
+        dir5Correct: v.directions.find(d => d.dir === 5)?.correct ?? null,
+        dir5Speed: v.directions.find(d => d.dir === 5)?.speed ?? null,
+        dir5Exp: v.directions.find(d => d.dir === 5)?.expGained ?? 0,
+        dir6ElapsedMs: v.directions.find(d => d.dir === 6)?.elapsedMs ?? null,
+        dir6Correct: v.directions.find(d => d.dir === 6)?.correct ?? null,
+        dir6Speed: v.directions.find(d => d.dir === 6)?.speed ?? null,
+        dir6Exp: v.directions.find(d => d.dir === 6)?.expGained ?? 0,
+      }));
+      
+      // Fire and forget - persist vocab details
+      fetch('/api/quiz/vocab-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ details: detailPayload }),
+      }).catch(() => {});
+    }
+  }, [sessionComplete, sessionId, answered.length]);
+
+  // Build per-vocabulary direction details
+  const buildVocabDetails = () => {
+    const byVocab = new Map<number, SessionAnswerDetail>();
+    for (const a of answered) {
+      const vid = a.question.vocabularyId;
+      const existing = byVocab.get(vid) ?? { vocabularyId: vid, front: a.question.front, directions: [] };
+      existing.directions.push({
+        dir: a.question.directionId,
+        elapsedMs: a.result.elapsedMs,
+        correct: a.result.correct,
+        speed: a.speed,
+        expGained: a.result.expGained,
+      });
+      byVocab.set(vid, existing);
+    }
+    return [...byVocab.values()].sort((a, b) => a.vocabularyId - b.vocabularyId);
+  };
+
+  // ----- Session Complete Screen -----
+  if (sessionComplete && answered.length > 0) {
+    const correctCount = answered.filter((a) => a.result.correct).length;
+    const expGained = answered.reduce((sum, a) => sum + a.result.expGained, 0);
     const speedCounts: Record<AnswerSpeed, number> = { easy: 0, good: 0, hard: 0 };
     for (const a of answered) speedCounts[a.speed] += 1;
     const avgSeconds = answered.length
-      ? Math.round((answered.reduce((s, a) => s + a.elapsedMs, 0) / answered.length / 1000) * 10) / 10
+      ? Math.round((answered.reduce((s, a) => s + a.result.elapsedMs, 0) / answered.length / 1000) * 10) / 10
       : 0;
 
-    // Direction-level breakdown
-    const byDir = new Map<number, { correct: number; total: number }>();
-    for (const a of answered) {
-      const dir = a.question.directionId;
-      const cur = byDir.get(dir) ?? { correct: 0, total: 0 };
-      cur.total += 1;
-      if (a.correct) cur.correct += 1;
-      byDir.set(dir, cur);
-    }
-    const dirSummaries = [...byDir.entries()]
-      .sort(([a], [b]) => a - b)
-      .map(([dirId, stats]) => ({
-        dirId,
-        label: answered.find((a) => a.question.directionId === dirId)?.question.directionLabel,
-        ...stats,
-      }));
+    const vocabDetails = buildVocabDetails();
+    const isLastSession = sessionIndex >= totalSessions - 1;
 
     return (
-      <div className="card mx-auto flex w-full max-w-2xl flex-col gap-6 p-6 sm:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 sm:p-8">
         <div className="text-center">
-          <p className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('summaryTitle')}</p>
+          <p className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('sessionComplete')}</p>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            {t('sessionProgress', { current: sessionIndex + 1, total: totalSessions })}
+          </p>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
             {t('summaryScore', { correct: correctCount, total: answered.length })}
           </p>
@@ -138,25 +276,6 @@ export function QuizSession({
             </p>
           )}
         </div>
-
-        {/* Direction breakdown */}
-        {dirSummaries.length > 0 && (
-          <div className="flex flex-col gap-2 text-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-400">{t('byDirection')}</h3>
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-              {dirSummaries.map((ds) => (
-                <div key={ds.dirId} className="flex items-center justify-between rounded-xl border border-ink-200/70 bg-washi-50 px-3 py-2 dark:border-ink-800 dark:bg-ink-900/40">
-                  <span className="text-xs text-ink-600 dark:text-ink-300">
-                    {ds.label?.source} → {ds.label?.target}
-                  </span>
-                  <span className={`font-semibold ${ds.correct === ds.total ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-500'}`}>
-                    {ds.correct}/{ds.total}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Speed buckets */}
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -170,6 +289,44 @@ export function QuizSession({
           ))}
         </div>
 
+        {/* Per-vocabulary breakdown with direction details */}
+        <div className="flex flex-col gap-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-400">{t('perVocabulary')}</h3>
+          <div className="flex flex-col gap-2">
+            {vocabDetails.map((vocab) => (
+              <div key={vocab.vocabularyId} className="rounded-xl border border-ink-200/70 bg-washi-50 p-4 dark:border-ink-800 dark:bg-ink-900/40">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-semibold text-ink-900 dark:text-washi-50">{vocab.front}</span>
+                  <span className="text-xs text-ink-500 dark:text-ink-400">
+                    {vocab.directions.length} {t('directions')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {vocab.directions.map((d) => (
+                    <div
+                      key={d.dir}
+                      className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium ${
+                        d.correct
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'
+                          : 'bg-shu-500/10 text-shu-600 dark:bg-shu-500/20 dark:text-shu-400'
+                      }`}
+                    >
+                      <span className="text-ink-500 dark:text-ink-400">{DIRECTION_NAMES[d.dir] ?? `Dir ${d.dir}`}</span>
+                      <span className="font-mono">
+                        {(d.elapsedMs / 1000).toFixed(1)}s
+                      </span>
+                      <span className={SPEED_LABELS[d.speed].badgeClass}>
+                        {t(SPEED_LABELS[d.speed].labelKey)}
+                      </span>
+                      {!d.correct && <span className="text-shu-600 dark:text-shu-400">{t('again')}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-ink-500 dark:text-ink-400">
           <span className="chip">{tLearn('correct')}: {correctCount}</span>
           <span className="chip">{t('avgTime', { seconds: String(avgSeconds) })}</span>
@@ -177,25 +334,71 @@ export function QuizSession({
         </div>
 
         <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500"
-            onClick={() => {
-              setIndex(0);
-              setAnswered([]);
-              setPicked(null);
-              setResult(null);
-            }}
-          >
-            ↺ {t('repeatSession')}
-          </button>
-          <Link href={`/learn?deck=${deckId}`} className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
-            {t('repeatDeck')}
-          </Link>
-          <Link href="/dashboard" className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
-            {t('backToDashboard')}
-          </Link>
+          {isLastSession ? (
+            <>
+              <Link href="/dashboard" className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
+                {t('finish')} → {t('backToDashboard')}
+              </Link>
+              <Link href={`/learn?deck=${deckId}`} className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
+                {t('repeatDeck')}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link 
+                href={`/quiz?deck=${deckId}&mode=${mode}&session=${sessionIndex + 1}`}
+                className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700"
+              >
+                → {t('nextSession')} ({sessionIndex + 2}/{totalSessions})
+              </Link>
+              <Link href={`/learn?deck=${deckId}`} className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
+                {t('repeatDeck')}
+              </Link>
+              <Link href="/dashboard" className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
+                {t('backToDashboard')}
+              </Link>
+            </>
+          )}
         </div>
+      </div>
+    );
+  }
+
+  // Auto-submit when session is done (no manual button needed)
+  useEffect(() => {
+    if (done && !submitting && !sessionComplete && pendingAnswers.length > 0) {
+      void submitRemaining();
+    }
+  }, [done, pendingAnswers.length, sessionComplete, submitting]);
+
+  // Loading state while submitting final answers
+  if (done && submitting) {
+    return (
+      <div className="card mx-auto flex w-full max-w-2xl flex-col items-center gap-4 p-10 text-center">
+        <p className="font-serif text-2xl text-ink-800 dark:text-washi-50">{t('submitting')}</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">{common('loading')}</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (done && error) {
+    return (
+      <div className="card mx-auto flex w-full max-w-2xl flex-col items-center gap-4 p-10 text-center">
+        <p className="font-serif text-2xl text-shu-600 dark:text-shu-400">{common('error')}</p>
+        <p className="text-sm text-ink-500 dark:text-ink-400">{error}</p>
+        <button
+          type="button"
+          className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700"
+          onClick={() => {
+            setSubmitting(false);
+            setError(null);
+            setIndex(0);
+            setPendingAnswers([]);
+          }}
+        >
+          {t('tryAgain')}
+        </button>
       </div>
     );
   }
@@ -212,11 +415,11 @@ export function QuizSession({
   }
 
   const reveal = picked !== null;
-  const lastResultCorrect = result !== null && 'correct' in result && result.correct;
-  const expGainedNow = result !== null && 'expGained' in result ? result.expGained : 0;
+  const lastAnswerCorrect = pendingAnswers.length > 0 ? pendingAnswers[pendingAnswers.length - 1].correct : false;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+      {/* Question Progress */}
       <div className="flex items-center justify-between text-sm">
         <span className="font-semibold uppercase tracking-wider text-ink-400">{deckTitle}</span>
         <span className="text-ink-500 dark:text-ink-400">
@@ -246,19 +449,20 @@ export function QuizSession({
         }`}>
           {t(mode === 'hard' ? 'modeHard' : 'modeNormal')}
         </span>
+        {/* Sync status badge */}
+        {(syncing || pendingAnswers.length > 0) && (
+          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            {t('syncing')}
+          </span>
+        )}
       </div>
 
       <p className="text-center text-sm font-semibold tracking-wide text-ink-500 dark:text-ink-400">{t('pickAnswer')}</p>
 
-      {error && <p className="text-center text-sm text-shu-500">{error}</p>}
-      {pending && !reveal && <p className="text-center text-sm text-ink-400">{common('loading')}</p>}
-
       {/* Front word */}
       <div className="card flex min-h-40 flex-col items-center justify-center gap-2 p-8 text-center">
         <p className="text-4xl font-semibold leading-relaxed text-ink-900 dark:text-washi-50">{question.front}</p>
-        {question.hint && (
-          <p className="text-2xl font-medium text-ink-500 dark:text-ink-300">{question.hint}</p>
-        )}
       </div>
 
       {/* 4 options */}
@@ -290,16 +494,11 @@ export function QuizSession({
 
       {reveal && (
         <div className="mt-1 flex flex-col items-center gap-2">
-          <p className={`text-sm font-semibold ${lastResultCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-shu-600 dark:text-shu-400'}`}>
-            {lastResultCorrect ? t('answerCorrect') : t('answerWrong')}
-            {lastResultCorrect && expGainedNow > 0 && (
-              <span className="ml-2 text-emerald-600 dark:text-emerald-400">
-                {tLearn('expGained', { exp: expGainedNow })}
-              </span>
-            )}
+          <p className={`text-sm font-semibold ${lastAnswerCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-shu-600 dark:text-shu-400'}`}>
+            {lastAnswerCorrect ? t('answerCorrect') : t('answerWrong')}
           </p>
-          {!lastResultCorrect && (
-            <button type="button" className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700" onClick={resetToState}>
+          {!lastAnswerCorrect && (
+            <button type="button" className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700" onClick={nextQuestion}>
               {t('next')} →
             </button>
           )}

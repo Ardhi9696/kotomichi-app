@@ -12,6 +12,11 @@ import type {
   DirectionThreshold,
   JlptLevel,
   PartOfSpeech,
+  QuizAnswerInput,
+  QuizMode,
+  QuizSession,
+  QuizSessionAnswer,
+  QuizSessionVocabDetail,
   ReviewLog,
   Role,
   RoleChange,
@@ -165,4 +170,15 @@ export interface VocabRepository {
   getActivity(userId: string, days: number): Promise<ActivityDay[]>;
   getRecentLogs(userId: string, limit?: number): Promise<ReviewLog[]>;
   getStudySeconds(userId: string, sinceDays: number): Promise<number>;
+
+  // ---------- quiz sessions ----------
+  createQuizSession(userId: string, deckId: number, mode: QuizMode, totalSessions: number, sessionIndex?: number): Promise<QuizSession>;
+  getQuizSession(userId: string, deckId: number, mode: QuizMode, sessionIndex: number): Promise<QuizSession | null>;
+  getQuizSessions(userId: string, deckId: number, mode: QuizMode): Promise<QuizSession[]>;
+  addQuizSessionAnswers(sessionId: number, answers: QuizAnswerInput[]): Promise<QuizSessionAnswer[]>;
+  upsertQuizSessionVocabDetails(sessionId: number, details: Omit<QuizSessionVocabDetail, 'id' | 'sessionId' | 'createdAt' | 'updatedAt'>[]): Promise<void>;
+  completeQuizSession(sessionId: number, correctCount: number, totalExp: number): Promise<void>;
+  markQuizSessionSynced(sessionId: number): Promise<void>;
+  getQuizSessionVocabDetails(sessionId: number): Promise<QuizSessionVocabDetail[]>;
+  getLatestInProgressQuizSession(userId: string, deckId: number, mode: QuizMode): Promise<QuizSession | null>;
 }

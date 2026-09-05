@@ -14,6 +14,11 @@ import type {
   DirectionThreshold,
   JlptLevel,
   PartOfSpeech,
+  QuizAnswerInput,
+  QuizMode,
+  QuizSession,
+  QuizSessionAnswer,
+  QuizSessionVocabDetail,
   ReviewLog,
   Role,
   RoleChange,
@@ -31,6 +36,9 @@ import {
   directionThresholds,
   exampleSentenceTranslations,
   exampleSentences,
+  quizSessionAnswers,
+  quizSessionVocabDetails,
+  quizSessions,
   reviewLog,
   roleChangeLog,
   srsProgress,
@@ -808,6 +816,300 @@ export class PostgresVocabRepo implements VocabRepository {
       .from(reviewLog)
       .where(and(eq(reviewLog.userId, userId), sql`${reviewLog.reviewedAt} >= ${since}`));
     return rows[0]?.seconds ?? 0;
+  }
+
+  // ================= quiz sessions =================
+  async createQuizSession(userId: string, deckId: number, mode: QuizMode, totalSessions: number, sessionIndex: number = 0): Promise<QuizSession> {
+    const db = getDb();
+    const now = new Date();
+    
+    // Check for existing session at this sessionIndex
+    const existing = await db
+      .select()
+      .from(quizSessions)
+      .where(and(
+        eq(quizSessions.userId, userId),
+        eq(quizSessions.deckId, deckId),
+        eq(quizSessions.mode, mode),
+        eq(quizSessions.sessionIndex, sessionIndex)
+      ))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      return this.mapQuizSession(existing[0]);
+    }
+    
+    const [session] = await db
+      .insert(quizSessions)
+      .values({
+        userId,
+        deckId,
+        mode,
+        sessionIndex,
+        totalSessions,
+        status: 'in_progress',
+        startedAt: now,
+        totalQuestions: 0,
+        correctCount: 0,
+        totalExp: 0,
+      })
+      .returning();
+    
+    return this.mapQuizSession(session);
+  }
+
+  async getQuizSession(userId: string, deckId: number, mode: QuizMode, sessionIndex: number): Promise<QuizSession | null> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(quizSessions)
+      .where(and(
+        eq(quizSessions.userId, userId),
+        eq(quizSessions.deckId, deckId),
+        eq(quizSessions.mode, mode),
+        eq(quizSessions.sessionIndex, sessionIndex)
+      ))
+      .limit(1);
+    return rows[0] ? this.mapQuizSession(rows[0]) : null;
+  }
+
+  async getQuizSessions(userId: string, deckId: number, mode: QuizMode): Promise<QuizSession[]> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(quizSessions)
+      .where(and(
+        eq(quizSessions.userId, userId),
+        eq(quizSessions.deckId, deckId),
+        eq(quizSessions.mode, mode)
+      ))
+      .orderBy(quizSessions.sessionIndex);
+    return rows.map(this.mapQuizSession);
+  }
+
+  async addQuizSessionAnswers(sessionId: number, answers: QuizAnswerInput[]): Promise<QuizSessionAnswer[]> {
+    const db = getDb();
+    const now = new Date();
+    
+    const results: QuizSessionAnswer[] = [];
+    for (const a of answers) {
+      const speed = this.getSpeedCategory(a.elapsedMs);
+      const exp = a.correct ? 10 : 0; // simplified
+      const [answer] = await db
+        .insert(quizSessionAnswers)
+        .values({
+          sessionId,
+          vocabularyId: a.vocabularyId,
+          direction: a.direction as Direction,
+          elapsedMs: a.elapsedMs,
+          correct: a.correct,
+          answerText: a.answer,
+          speedCategory: speed,
+          expGained: exp,
+          submittedAt: now,
+          synced: false,
+        })
+        .returning();
+      results.push({
+        id: answer.id,
+        sessionId: answer.sessionId,
+        vocabularyId: answer.vocabularyId,
+        direction: answer.direction,
+        elapsedMs: answer.elapsedMs,
+        correct: answer.correct,
+        answerText: answer.answerText,
+        speedCategory: answer.speedCategory,
+        expGained: answer.expGained,
+        submittedAt: iso(answer.submittedAt),
+        synced: answer.synced,
+      });
+    }
+    return results;
+  }
+
+  private getSpeedCategory(elapsedMs: number): 'easy' | 'good' | 'hard' {
+    if (elapsedMs <= 8000) return 'easy';
+    if (elapsedMs <= 15000) return 'good';
+    return 'hard';
+  }
+
+  async upsertQuizSessionVocabDetails(sessionId: number, details: Omit<QuizSessionVocabDetail, 'id' | 'sessionId' | 'createdAt' | 'updatedAt'>[]): Promise<void> {
+    const db = getDb();
+    for (const detail of details) {
+      await db
+        .insert(quizSessionVocabDetails)
+        .values({
+          sessionId,
+          vocabularyId: detail.vocabularyId,
+          dir1ElapsedMs: detail.dir1ElapsedMs ?? null,
+          dir1Correct: detail.dir1Correct ?? null,
+          dir1Speed: detail.dir1Speed ?? null,
+          dir1Exp: detail.dir1Exp ?? 0,
+          dir2ElapsedMs: detail.dir2ElapsedMs ?? null,
+          dir2Correct: detail.dir2Correct ?? null,
+          dir2Speed: detail.dir2Speed ?? null,
+          dir2Exp: detail.dir2Exp ?? 0,
+          dir3ElapsedMs: detail.dir3ElapsedMs ?? null,
+          dir3Correct: detail.dir3Correct ?? null,
+          dir3Speed: detail.dir3Speed ?? null,
+          dir3Exp: detail.dir3Exp ?? 0,
+          dir4ElapsedMs: detail.dir4ElapsedMs ?? null,
+          dir4Correct: detail.dir4Correct ?? null,
+          dir4Speed: detail.dir4Speed ?? null,
+          dir4Exp: detail.dir4Exp ?? 0,
+          dir5ElapsedMs: detail.dir5ElapsedMs ?? null,
+          dir5Correct: detail.dir5Correct ?? null,
+          dir5Speed: detail.dir5Speed ?? null,
+          dir5Exp: detail.dir5Exp ?? 0,
+          dir6ElapsedMs: detail.dir6ElapsedMs ?? null,
+          dir6Correct: detail.dir6Correct ?? null,
+          dir6Speed: detail.dir6Speed ?? null,
+          dir6Exp: detail.dir6Exp ?? 0,
+        })
+        .onConflictDoUpdate({
+          target: [quizSessionVocabDetails.sessionId, quizSessionVocabDetails.vocabularyId],
+          set: {
+            dir1ElapsedMs: detail.dir1ElapsedMs ?? null,
+            dir1Correct: detail.dir1Correct ?? null,
+            dir1Speed: detail.dir1Speed ?? null,
+            dir1Exp: detail.dir1Exp ?? 0,
+            dir2ElapsedMs: detail.dir2ElapsedMs ?? null,
+            dir2Correct: detail.dir2Correct ?? null,
+            dir2Speed: detail.dir2Speed ?? null,
+            dir2Exp: detail.dir2Exp ?? 0,
+            dir3ElapsedMs: detail.dir3ElapsedMs ?? null,
+            dir3Correct: detail.dir3Correct ?? null,
+            dir3Speed: detail.dir3Speed ?? null,
+            dir3Exp: detail.dir3Exp ?? 0,
+            dir4ElapsedMs: detail.dir4ElapsedMs ?? null,
+            dir4Correct: detail.dir4Correct ?? null,
+            dir4Speed: detail.dir4Speed ?? null,
+            dir4Exp: detail.dir4Exp ?? 0,
+            dir5ElapsedMs: detail.dir5ElapsedMs ?? null,
+            dir5Correct: detail.dir5Correct ?? null,
+            dir5Speed: detail.dir5Speed ?? null,
+            dir5Exp: detail.dir5Exp ?? 0,
+            dir6ElapsedMs: detail.dir6ElapsedMs ?? null,
+            dir6Correct: detail.dir6Correct ?? null,
+            dir6Speed: detail.dir6Speed ?? null,
+            dir6Exp: detail.dir6Exp ?? 0,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  }
+
+  async completeQuizSession(sessionId: number, correctCount: number, totalExp: number): Promise<void> {
+    const db = getDb();
+    const now = new Date();
+    await db
+      .update(quizSessions)
+      .set({
+        status: 'completed',
+        completedAt: now,
+        correctCount,
+        totalExp,
+        updatedAt: now,
+      })
+      .where(eq(quizSessions.id, sessionId));
+  }
+
+  async markQuizSessionSynced(sessionId: number): Promise<void> {
+    const db = getDb();
+    const now = new Date();
+    await db
+      .update(quizSessions)
+      .set({
+        status: 'synced',
+        syncedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(quizSessions.id, sessionId));
+    
+    // Mark answers as synced
+    await db
+      .update(quizSessionAnswers)
+      .set({ synced: true })
+      .where(eq(quizSessionAnswers.sessionId, sessionId));
+  }
+
+  async getQuizSessionVocabDetails(sessionId: number): Promise<QuizSessionVocabDetail[]> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(quizSessionVocabDetails)
+      .where(eq(quizSessionVocabDetails.sessionId, sessionId));
+    return rows.map(this.mapQuizSessionVocabDetail);
+  }
+
+  async getLatestInProgressQuizSession(userId: string, deckId: number, mode: QuizMode): Promise<QuizSession | null> {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(quizSessions)
+      .where(and(
+        eq(quizSessions.userId, userId),
+        eq(quizSessions.deckId, deckId),
+        eq(quizSessions.mode, mode),
+        eq(quizSessions.status, 'in_progress')
+      ))
+      .orderBy(desc(quizSessions.sessionIndex))
+      .limit(1);
+    return rows[0] ? this.mapQuizSession(rows[0]) : null;
+  }
+
+  private mapQuizSession(r: typeof quizSessions.$inferSelect): QuizSession {
+    return {
+      id: r.id,
+      userId: r.userId,
+      deckId: r.deckId,
+      mode: r.mode,
+      sessionIndex: r.sessionIndex,
+      totalSessions: r.totalSessions,
+      status: r.status,
+      startedAt: iso(r.startedAt),
+      completedAt: isoOrNull(r.completedAt),
+      syncedAt: isoOrNull(r.syncedAt),
+      totalQuestions: r.totalQuestions,
+      correctCount: r.correctCount,
+      totalExp: r.totalExp,
+      createdAt: iso(r.createdAt),
+      updatedAt: iso(r.updatedAt),
+    };
+  }
+
+  private mapQuizSessionVocabDetail(r: typeof quizSessionVocabDetails.$inferSelect): QuizSessionVocabDetail {
+    return {
+      id: r.id,
+      sessionId: r.sessionId,
+      vocabularyId: r.vocabularyId,
+      dir1ElapsedMs: r.dir1ElapsedMs ?? 0,
+      dir1Correct: r.dir1Correct ?? false,
+      dir1Speed: r.dir1Speed ?? 'easy',
+      dir1Exp: r.dir1Exp ?? 0,
+      dir2ElapsedMs: r.dir2ElapsedMs ?? 0,
+      dir2Correct: r.dir2Correct ?? false,
+      dir2Speed: r.dir2Speed ?? 'easy',
+      dir2Exp: r.dir2Exp ?? 0,
+      dir3ElapsedMs: r.dir3ElapsedMs ?? 0,
+      dir3Correct: r.dir3Correct ?? false,
+      dir3Speed: r.dir3Speed ?? 'easy',
+      dir3Exp: r.dir3Exp ?? 0,
+      dir4ElapsedMs: r.dir4ElapsedMs ?? 0,
+      dir4Correct: r.dir4Correct ?? false,
+      dir4Speed: r.dir4Speed ?? 'easy',
+      dir4Exp: r.dir4Exp ?? 0,
+      dir5ElapsedMs: r.dir5ElapsedMs ?? 0,
+      dir5Correct: r.dir5Correct ?? false,
+      dir5Speed: r.dir5Speed ?? 'easy',
+      dir5Exp: r.dir5Exp ?? 0,
+      dir6ElapsedMs: r.dir6ElapsedMs ?? 0,
+      dir6Correct: r.dir6Correct ?? false,
+      dir6Speed: r.dir6Speed ?? 'easy',
+      dir6Exp: r.dir6Exp ?? 0,
+      createdAt: iso(r.createdAt),
+      updatedAt: iso(r.updatedAt),
+    };
   }
 }
 

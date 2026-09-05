@@ -8,17 +8,20 @@ import { buildQuizSession, type QuizMode } from '@/lib/srs/quiz';
 
 export const metadata: Metadata = { title: 'Quiz — Kotomichi' };
 
+const WORDS_PER_SESSION = 5;
+
 export default async function QuizPage({
   searchParams,
 }: {
-  searchParams: Promise<{ deck?: string; mode?: string }>;
+  searchParams: Promise<{ deck?: string; mode?: string; session?: string }>;
 }) {
   await requireLearner();
   const t = await getTranslations('learn');
   const tq = await getTranslations('quiz');
-  const { deck, mode: rawMode } = await searchParams;
+  const { deck, mode: rawMode, session: rawSession } = await searchParams;
   const deckId = Number(deck);
   const mode: QuizMode = rawMode === 'hard' ? 'hard' : 'normal';
+  const sessionIndex = rawSession ? Number(rawSession) : 0;
 
   const { user, profile, repo, service } = await getStudyContext();
   const now = new Date().toISOString();
@@ -29,7 +32,23 @@ export default async function QuizPage({
   if (!active) redirect('/learn');
 
   const words = await repo.getDeckWords(active.deck.id);
-  const questions = buildQuizSession(words, locale, mode);
+  const totalWords = words.length;
+  const totalSessions = Math.ceil(totalWords / WORDS_PER_SESSION);
+
+  // Clamp session index
+  const clampedSessionIndex = Math.max(0, Math.min(sessionIndex, totalSessions - 1));
+
+  // If user is trying to access a different session, redirect
+  if (clampedSessionIndex !== sessionIndex) {
+    redirect(`/quiz?deck=${deckId}&mode=${mode}&session=${clampedSessionIndex}`);
+  }
+
+  // Get or create quiz session for this specific session index
+  const quizSession = await repo.createQuizSession(user.id, active.deck.id, mode, totalSessions, clampedSessionIndex);
+
+  // Get words for this session
+  const sessionWords = words.slice(clampedSessionIndex * WORDS_PER_SESSION, (clampedSessionIndex + 1) * WORDS_PER_SESSION);
+  const questions = buildQuizSession(sessionWords, locale, mode);
 
   if (questions.length === 0) {
     return (
@@ -42,15 +61,44 @@ export default async function QuizPage({
     );
   }
 
+  // Overall deck progress (across all sessions)
+  const overallProgress = totalSessions > 0 ? ((clampedSessionIndex + 1) / totalSessions) * 100 : 0;
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Overall Deck Progress Bar */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="font-semibold uppercase tracking-wider text-ink-400">
+            {tq('deckProgress')} {clampedSessionIndex + 1} / {totalSessions} {tq('sessions')}
+          </span>
+          <span className="text-ink-500 dark:text-ink-400">
+            {tq('wordsTotal', { current: (clampedSessionIndex + 1) * WORDS_PER_SESSION, total: totalWords })}
+          </span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500 transition-all"
+            style={{ width: `${overallProgress}%` }}
+          />
+        </div>
+      </div>
+
       <div className="text-center">
         <h1 className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('quizTitle')}</h1>
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
           {tq(mode === 'hard' ? 'modeHardDescription' : 'modeNormalDescription')}
         </p>
       </div>
-      <QuizSession questions={questions} deckId={active.deck.id} deckTitle={active.deck.title} mode={mode} />
+      <QuizSession 
+        questions={questions} 
+        deckId={active.deck.id} 
+        deckTitle={active.deck.title} 
+        mode={mode}
+        sessionIndex={clampedSessionIndex}
+        totalSessions={totalSessions}
+        sessionId={quizSession.id}
+      />
     </div>
   );
 }

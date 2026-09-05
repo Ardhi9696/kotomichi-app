@@ -244,3 +244,92 @@ export type QuizAnswerResult = {
   nextStreak: number;
   streakMilestone: boolean;
 } | { error: string };
+
+// Quiz Session batch submission
+export interface QuizAnswerInput {
+  vocabularyId: number;
+  direction: number;
+  elapsedMs: number;
+  correct: boolean;
+  answer: string;
+}
+
+export interface QuizAnswerOutput {
+  vocabularyId: number;
+  direction: number;
+  correct: boolean;
+  elapsedMs: number;
+  expGained: number;
+}
+
+// Quiz Session types
+export type QuizMode = 'normal' | 'hard';
+export type QuizSessionStatus = 'in_progress' | 'completed' | 'synced';
+
+export interface QuizSession {
+  id: number;
+  userId: string;
+  deckId: number;
+  mode: QuizMode;
+  sessionIndex: number;
+  totalSessions: number;
+  status: QuizSessionStatus;
+  startedAt: string;
+  completedAt: string | null;
+  syncedAt: string | null;
+  totalQuestions: number;
+  correctCount: number;
+  totalExp: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuizSessionAnswer {
+  id: number;
+  sessionId: number;
+  vocabularyId: number;
+  direction: number;
+  elapsedMs: number;
+  correct: boolean;
+  answerText: string | null;
+  speedCategory: 'easy' | 'good' | 'hard' | null;
+  expGained: number;
+  submittedAt: string;
+  synced: boolean;
+}
+
+export interface QuizSessionVocabDetail {
+  id: number;
+  sessionId: number;
+  vocabularyId: number;
+  dir1ElapsedMs: number | null;
+  dir1Correct: boolean | null;
+  dir1Speed: 'easy' | 'good' | 'hard' | null;
+  dir1Exp: number;
+  dir2ElapsedMs: number | null;
+  dir2Correct: boolean | null;
+  dir2Speed: 'easy' | 'good' | 'hard' | null;
+  dir2Exp: number;
+  dir3ElapsedMs: number | null;
+  dir3Correct: boolean | null;
+  dir3Speed: 'easy' | 'good' | 'hard' | null;
+  dir3Exp: number;
+  dir4ElapsedMs: number | null;
+  dir4Correct: boolean | null;
+  dir4Speed: 'easy' | 'good' | 'hard' | null;
+  dir4Exp: number;
+  dir5ElapsedMs: number | null;
+  dir5Correct: boolean | null;
+  dir5Speed: 'easy' | 'good' | 'hard' | null;
+  dir5Exp: number;
+  dir6ElapsedMs: number | null;
+  dir6Correct: boolean | null;
+  dir6Speed: 'easy' | 'good' | 'hard' | null;
+  dir6Exp: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuizSessionWithDetails extends QuizSession {
+  vocabDetails: QuizSessionVocabDetail[];
+}
