@@ -7,12 +7,14 @@
     "home": "Dashboard",
     "learn": "Learn",
     "review": "Review",
-    "admin": "Admin",
+    "admin": "Content",
+    "users": "Manage users",
+    "appConfig": "App Configuration",
+    "account": "Account",
     "login": "Log in",
     "register": "Create account",
     "logout": "Log out",
-    "menu": "Menu",
-    "setting": "Settings"
+    "menu": "Menu"
   },
   "auth": {
     "signInTitle": "Welcome back",
@@ -116,7 +118,7 @@
     "tabVocab": "Vocabulary",
     "tabDecks": "Decks",
     "tabUsers": "Users",
-    "tabConfig": "Settings",
+    "tabConfig": "App Configuration",
     "search": "Search…",
     "add": "Add",
     "save": "Save",

@@ -4,15 +4,13 @@ import Link from 'next/link';
 
 import { requireRole } from '@/lib/server/dal';
 import { getRepository } from '@/lib/server/runtime';
-import { DecksSection } from '@/components/admin/decks-section';
-import { VocabDashboard } from '@/components/admin/vocab-dashboard';
+import { ContentTabs } from '@/components/admin/content-tabs';
 
 export const metadata: Metadata = { title: 'Content — Kotomichi' };
 
 export default async function ContentPage() {
-  const current = await requireRole('admin', 'super_admin');
+  await requireRole('admin', 'super_admin');
   const t = await getTranslations('admin');
-  const isSuper = current.profile.role === 'super_admin';
 
   const repo = await getRepository();
   const [words, decks] = await Promise.all([
@@ -27,17 +25,7 @@ export default async function ContentPage() {
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
       </section>
 
-      {isSuper && (
-        <div className="flex gap-3">
-          <Link href="/admin/users" className="btn-secondary">{t('manageUsers')}</Link>
-          <Link href="/admin/settings" className="btn-secondary">{t('tabConfig')}</Link>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-6">
-        <VocabDashboard words={words} decks={decks} />
-        <DecksSection decks={decks} />
-      </div>
+      <ContentTabs words={words} decks={decks} />
 
       <p>
         <Link href="/dashboard" className="text-sm text-shu-500 hover:underline">← {t('overviewTitle')}</Link>

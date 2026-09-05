@@ -7,12 +7,14 @@
     "home": "Dasbor",
     "learn": "Belajar",
     "review": "Ulangi",
-    "admin": "Kelola",
+    "admin": "Konten",
+    "users": "Kelola pengguna",
+    "appConfig": "Konfigurasi Aplikasi",
+    "account": "Akun",
     "login": "Masuk",
     "register": "Buat akun",
     "logout": "Keluar",
-    "menu": "Menu",
-    "setting": "Pengaturan"
+    "menu": "Menu"
   },
   "auth": {
     "signInTitle": "Selamat datang kembali",
@@ -116,7 +118,7 @@
     "tabVocab": "Kosakata",
     "tabDecks": "Deck",
     "tabUsers": "Pengguna",
-    "tabConfig": "Pengaturan",
+    "tabConfig": "Konfigurasi Aplikasi",
     "search": "Cari…",
     "add": "Tambah",
     "save": "Simpan",

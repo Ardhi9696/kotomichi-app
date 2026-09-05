@@ -232,7 +232,31 @@ export class InMemoryVocabRepo implements VocabRepository {
       for (const tr of patch.translations) t[tr.locale] = tr.meaning;
       w.translations = t;
     }
+    if (patch.examples) {
+      w.examples = patch.examples.map((e) => ({
+        id: this.nextExampleId++,
+        vocabularyId: id,
+        japanese: e.japanese,
+        translations: e.translations,
+      }));
+    }
+    if (patch.collocations) {
+      w.collocations = patch.collocations.map((c) => ({
+        id: this.nextCollocId++,
+        vocabularyId: id,
+        collocation: c.collocation,
+        meaning: c.meaning ?? null,
+      }));
+    }
     return { ...w.vocabulary };
+  }
+
+  async deleteVocabulary(id: number): Promise<void> {
+    this.words.delete(id);
+    for (const [, ids] of this.deckMembership) {
+      const i = ids.indexOf(id);
+      if (i !== -1) ids.splice(i, 1);
+    }
   }
 
   // ================= decks =================

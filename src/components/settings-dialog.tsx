@@ -32,7 +32,7 @@ export function SettingsDialog({ profile }: { profile: ProfileSettings }) {
         className="w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors text-ink-600 hover:text-ink-800 dark:text-ink-300 dark:hover:text-ink-100 md:w-auto md:py-1.5"
         onClick={() => setSession((s) => s + 1)}
       >
-        {t('setting')}
+        {t('account')}
       </button>
       {session > 0 && <SettingsBody key={session} profile={profile} onClose={() => setSession(0)} />}
     </>

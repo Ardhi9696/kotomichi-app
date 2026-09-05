@@ -31,6 +31,8 @@ export function AppHeader({
       ? [
           { href: '/dashboard', label: t('nav.home') },
           { href: '/admin/content', label: t('nav.admin') },
+          { href: '/admin/users', label: t('nav.users') },
+          { href: '/admin/settings', label: t('nav.appConfig') },
         ]
       : [
           { href: '/dashboard', label: t('nav.home') },

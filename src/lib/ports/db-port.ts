@@ -118,6 +118,7 @@ export interface VocabRepository {
   getWordsByIds(ids: number[]): Promise<WordCard[]>;
   createVocabulary(input: TagWithVocabInput, createdBy: string | null): Promise<Vocabulary>;
   updateVocabulary(id: number, patch: Partial<TagWithVocabInput>): Promise<Vocabulary | null>;
+  deleteVocabulary(id: number): Promise<void>;
 
   // ---------- decks ----------
   listDecks(opts?: { publishedOnly?: boolean; q?: string }): Promise<Deck[]>;

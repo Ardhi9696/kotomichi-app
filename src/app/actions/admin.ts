@@ -65,6 +65,32 @@ function parseDynamic(formData: FormData, key: string): string[] {
   return out;
 }
 
+function parseExamples(formData: FormData): NonNullable<TagWithVocabInput['examples']> {
+  const examples: TagWithVocabInput['examples'] = [];
+  const jpExamples = parseDynamic(formData, 'exampleJp');
+  for (let i = 0; i < jpExamples.length; i++) {
+    const t: { locale: string; translation: string }[] = [];
+    for (const locale of ['id', 'en']) {
+      const translation = String(formData.get(`exampleTr_${i}_${locale}`) ?? '').trim();
+      if (translation) t.push({ locale, translation });
+    }
+    examples.push({ japanese: jpExamples[i], translations: t });
+  }
+  return examples;
+}
+
+function parseCollocations(formData: FormData): NonNullable<TagWithVocabInput['collocations']> {
+  const collocations: TagWithVocabInput['collocations'] = [];
+  const collocTexts = parseDynamic(formData, 'collocation');
+  for (let i = 0; i < collocTexts.length; i++) {
+    collocations.push({
+      collocation: collocTexts[i],
+      meaning: String(formData.get(`collocationMeaning[${i}]`) ?? '').trim() || null,
+    });
+  }
+  return collocations;
+}
+
 export async function createVocabularyAction(formData: FormData): Promise<void> {
   await requireRole('admin', 'super_admin');
   const repo = await getRepository();
@@ -77,27 +103,9 @@ export async function createVocabularyAction(formData: FormData): Promise<void> 
   const partOfSpeech = partOfSpeechValue(formData.get('partOfSpeech') as string | null);
   const translations = parseTranslations(formData);
 
-  const examples: TagWithVocabInput['examples'] = [];
-  const jpExamples = parseDynamic(formData, 'exampleJp');
-  for (let i = 0; i < jpExamples.length; i++) {
-    const t: { locale: string; translation: string }[] = [];
-    for (const locale of ['id', 'en']) {
-      const translation = String(formData.get(`exampleTr_${i}_${locale}`) ?? '').trim();
-      if (translation) t.push({ locale, translation });
-    }
-    examples.push({ japanese: jpExamples[i], translations: t });
-  }
-
-  const collocations: TagWithVocabInput['collocations'] = [];
-  const collocTexts = parseDynamic(formData, 'collocation');
-  for (let i = 0; i < collocTexts.length; i++) {
-    collocations.push({
-      collocation: collocTexts[i],
-      meaning: String(formData.get(`collocationMeaning[${i}]`) ?? '').trim() || null,
-    });
-  }
-
   const jft = jlptWithJft(formData);
+  const examples = parseExamples(formData);
+  const collocations = parseCollocations(formData);
 
   const deckIds = formData
     .getAll('deckIds')
@@ -129,24 +137,29 @@ export async function upsertVocabularyAction(formData: FormData): Promise<void> 
   const translations = parseTranslations(formData);
 
   const jft = jlptWithJft(formData);
+  const examples = parseExamples(formData);
+  const collocations = parseCollocations(formData);
 
   if (Number.isFinite(id) && id > 0) {
     await repo.updateVocabulary(id, {
       kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
-      ...grammarFlagsAll(formData), translations,
+      ...grammarFlagsAll(formData), translations, examples, collocations,
     });
   } else {
     await repo.createVocabulary(
       { kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
-        ...grammarFlagsAll(formData), translations },
+        ...grammarFlagsAll(formData), translations, examples, collocations },
       null,
     );
   }
   revalidatePath('/admin/content');
 }
 
-export async function removeVocabularyAction(_formData: FormData): Promise<void> {
+export async function removeVocabularyAction(formData: FormData): Promise<void> {
   await requireRole('admin', 'super_admin');
+  const repo = await getRepository();
+  const id = Number(formData.get('id'));
+  if (Number.isFinite(id) && id > 0) await repo.deleteVocabulary(id);
   revalidatePath('/admin/content');
 }
 
@@ -193,6 +206,14 @@ export async function togglePublishAction(formData: FormData): Promise<void> {
   const id = Number(formData.get('id'));
   const published = formData.get('published') === 'on';
   if (Number.isFinite(id) && id > 0) await repo.updateDeck(id, { isPublished: published });
+  revalidatePath('/admin/content');
+}
+
+export async function deleteDeckAction(formData: FormData): Promise<void> {
+  await requireRole('admin', 'super_admin');
+  const repo = await getRepository();
+  const id = Number(formData.get('id'));
+  if (Number.isFinite(id) && id > 0) await repo.deleteDeck(id);
   revalidatePath('/admin/content');
 }
 

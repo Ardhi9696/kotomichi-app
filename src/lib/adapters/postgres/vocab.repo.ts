@@ -441,12 +441,36 @@ export class PostgresVocabRepo implements VocabRepository {
         patch.translations.map((t) => ({ vocabularyId: id, locale: t.locale, meaning: t.meaning })),
       );
     }
+    if (patch.examples) {
+      await db.delete(exampleSentences).where(eq(exampleSentences.vocabularyId, id));
+      for (const ex of patch.examples) {
+        const exRow = await db
+          .insert(exampleSentences)
+          .values({ vocabularyId: id, japanese: ex.japanese })
+          .returning();
+        if (ex.translations.length) {
+          await db.insert(exampleSentenceTranslations).values(
+            ex.translations.map((t) => ({ exampleSentenceId: exRow[0].id, locale: t.locale, translation: t.translation })),
+          );
+        }
+      }
+    }
+    if (patch.collocations) {
+      await db.delete(verbCollocations).where(eq(verbCollocations.vocabularyId, id));
+      await db.insert(verbCollocations).values(
+        patch.collocations.map((c) => ({ vocabularyId: id, collocation: c.collocation, meaning: c.meaning ?? null })),
+      );
+    }
     return rows[0]
       ? {
           id: rows[0].id, kanji: rows[0].kanji, hiragana: rows[0].hiragana, romaji: rows[0].romaji,
           jlptLevel: rows[0].jlptLevel as JlptLevel | null, jftBasic: rows[0].jftBasic, partOfSpeech: toPartOfSpeech(rows[0].partOfSpeech), ...vocabGrammar(rows[0]), isActive: rows[0].isActive,
         }
       : null;
+  }
+
+  async deleteVocabulary(id: number): Promise<void> {
+    await getDb().delete(vocabulary).where(eq(vocabulary.id, id));
   }
 
   // ================= decks =================
