@@ -174,7 +174,16 @@ export class InMemoryVocabRepo implements VocabRepository {
       hiragana: input.hiragana,
       romaji: input.romaji ?? null,
       jlptLevel: input.jlptLevel ?? null,
+      jftBasic: input.jftBasic ?? false,
       partOfSpeech: input.partOfSpeech ?? null,
+      godanVerb: input.godanVerb ?? false,
+      ichidanVerb: input.ichidanVerb ?? false,
+      fukisoku: input.fukisoku ?? false,
+      iAdjective: input.iAdjective ?? false,
+      naAdjective: input.naAdjective ?? false,
+      jidoushi: input.jidoushi ?? false,
+      tadoushi: input.tadoushi ?? false,
+      verbCollocation: input.verbCollocation ?? false,
       isActive: true,
     };
     const translations: Record<string, string> = {};
@@ -208,7 +217,16 @@ export class InMemoryVocabRepo implements VocabRepository {
     if (patch.hiragana !== undefined) w.vocabulary.hiragana = patch.hiragana;
     if (patch.romaji !== undefined) w.vocabulary.romaji = patch.romaji ?? null;
     if (patch.jlptLevel !== undefined) w.vocabulary.jlptLevel = (patch.jlptLevel as JlptLevel | null) ?? null;
+    if (patch.jftBasic !== undefined) w.vocabulary.jftBasic = patch.jftBasic;
     if (patch.partOfSpeech !== undefined) w.vocabulary.partOfSpeech = patch.partOfSpeech ?? null;
+    if (patch.godanVerb !== undefined) w.vocabulary.godanVerb = patch.godanVerb;
+    if (patch.ichidanVerb !== undefined) w.vocabulary.ichidanVerb = patch.ichidanVerb;
+    if (patch.fukisoku !== undefined) w.vocabulary.fukisoku = patch.fukisoku;
+    if (patch.iAdjective !== undefined) w.vocabulary.iAdjective = patch.iAdjective;
+    if (patch.naAdjective !== undefined) w.vocabulary.naAdjective = patch.naAdjective;
+    if (patch.jidoushi !== undefined) w.vocabulary.jidoushi = patch.jidoushi;
+    if (patch.tadoushi !== undefined) w.vocabulary.tadoushi = patch.tadoushi;
+    if (patch.verbCollocation !== undefined) w.vocabulary.verbCollocation = patch.verbCollocation;
     if (patch.translations) {
       const t: Record<string, string> = {};
       for (const tr of patch.translations) t[tr.locale] = tr.meaning;
@@ -238,6 +256,7 @@ export class InMemoryVocabRepo implements VocabRepository {
       title: input.title,
       subtitle: input.subtitle ?? null,
       jlptLevel: (input.jlptLevel as JlptLevel | null) ?? null,
+      jftBasic: input.jftBasic ?? false,
       orderIndex: input.orderIndex,
       isPublished: input.isPublished ?? false,
       createdBy,
@@ -257,6 +276,7 @@ export class InMemoryVocabRepo implements VocabRepository {
       title: patch.title ?? d.title,
       subtitle: patch.subtitle === undefined ? d.subtitle : patch.subtitle,
       jlptLevel: patch.jlptLevel === undefined ? d.jlptLevel : (patch.jlptLevel ?? null),
+      jftBasic: patch.jftBasic === undefined ? d.jftBasic : patch.jftBasic,
       orderIndex: patch.orderIndex ?? d.orderIndex,
       isPublished: patch.isPublished ?? d.isPublished,
       updatedAt: new Date().toISOString(),

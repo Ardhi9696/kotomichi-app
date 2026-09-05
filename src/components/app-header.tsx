@@ -30,7 +30,7 @@ export function AppHeader({
     ? isAdmin
       ? [
           { href: '/dashboard', label: t('nav.home') },
-          { href: '/admin', label: t('nav.admin') },
+          { href: '/admin/content', label: t('nav.admin') },
         ]
       : [
           { href: '/dashboard', label: t('nav.home') },

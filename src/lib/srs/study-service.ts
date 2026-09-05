@@ -320,6 +320,7 @@ export class StudyService {
           title: deck.title,
           subtitle: deck.subtitle,
           jlptLevel: deck.jlptLevel,
+          jftBasic: deck.jftBasic,
           orderIndex: deck.orderIndex,
           isPublished: deck.isPublished,
           createdBy: deck.createdBy,

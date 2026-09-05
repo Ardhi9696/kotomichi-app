@@ -248,7 +248,7 @@ async function AdminOverview({ currentRole }: { currentRole: Role }) {
         <div className="card p-6">
           <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('quickActions')}</h2>
           <div className="flex flex-col gap-2">
-            <Link href="/admin" className="btn-primary">{t('manageContent')}</Link>
+            <Link href="/admin/content" className="btn-primary">{t('manageContent')}</Link>
             {currentRole === 'super_admin' && (
               <>
                 <Link href="/admin/users" className="btn-ghost">{t('manageUsers')}</Link>

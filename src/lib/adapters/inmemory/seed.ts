@@ -4,11 +4,22 @@
  * management UI. Japanese meanings are Indonesian + English.
  */
 
-import type { Deck, WordCard } from '@/lib/domain';
+import type { Deck, PartOfSpeech, WordCard } from '@/lib/domain';
 import type { TagWithVocabInput } from '@/lib/ports/db-port';
 
 export interface SeedWord {
   input: TagWithVocabInput;
+}
+
+export interface SeedFlags {
+  godan?: boolean;
+  ichidan?: boolean;
+  fukisoku?: boolean;
+  iAdj?: boolean;
+  naAdj?: boolean;
+  jidoushi?: boolean;
+  tadoushi?: boolean;
+  verbColloc?: boolean;
 }
 
 const w = (
@@ -16,9 +27,10 @@ const w = (
   hiragana: string,
   romaji: string | null,
   jlptLevel: 'N5' | 'N4',
-  partOfSpeech: string,
+  partOfSpeech: PartOfSpeech,
   meanings: { id: string; en: string }[],
   examples: { japanese: string; id: string; en: string }[],
+  flags: SeedFlags = {},
 ): SeedWord => ({
   input: {
     kanji,
@@ -26,6 +38,14 @@ const w = (
     romaji,
     jlptLevel,
     partOfSpeech,
+    godanVerb: flags.godan ?? false,
+    ichidanVerb: flags.ichidan ?? false,
+    fukisoku: flags.fukisoku ?? false,
+    iAdjective: flags.iAdj ?? false,
+    naAdjective: flags.naAdj ?? false,
+    jidoushi: flags.jidoushi ?? false,
+    tadoushi: flags.tadoushi ?? false,
+    verbCollocation: flags.verbColloc ?? false,
     translations: [
       { locale: 'id', meaning: meanings[0].id },
       { locale: 'en', meaning: meanings[0].en },
@@ -42,9 +62,9 @@ const w = (
 
 export const SEED_WORDS: readonly SeedWord[] = [
   w('水', 'みず', 'mizu', 'N5', 'noun', [{ id: 'air', en: 'water' }], [{ japanese: '水を飲みます。', id: 'Saya minum air.', en: 'I drink water.' }]),
-  w('食べる', 'たべる', 'taberu', 'N5', 'verb', [{ id: 'makan', en: 'to eat' }], [{ japanese: 'ご飯を食べます。', id: 'Saya makan nasi.', en: 'I eat rice.' }]),
-  w('行く', 'いく', 'iku', 'N5', 'verb', [{ id: 'pergi', en: 'to go' }], [{ japanese: '学校へ行きます。', id: 'Saya pergi ke sekolah.', en: 'I go to school.' }]),
-  w('見る', 'みる', 'miru', 'N5', 'verb', [{ id: 'melihat', en: 'to look/see' }], [{ japanese: '映画を見ます。', id: 'Saya menonton film.', en: 'I watch a movie.' }]),
+  w('食べる', 'たべる', 'taberu', 'N5', 'verb', [{ id: 'makan', en: 'to eat' }], [{ japanese: 'ご飯を食べます。', id: 'Saya makan nasi.', en: 'I eat rice.' }], { ichidan: true, tadoushi: true, verbColloc: true }),
+  w('行く', 'いく', 'iku', 'N5', 'verb', [{ id: 'pergi', en: 'to go' }], [{ japanese: '学校へ行きます。', id: 'Saya pergi ke sekolah.', en: 'I go to school.' }], { godan: true, jidoushi: true }),
+  w('見る', 'みる', 'miru', 'N5', 'verb', [{ id: 'melihat', en: 'to look/see' }], [{ japanese: '映画を見ます。', id: 'Saya menonton film.', en: 'I watch a movie.' }], { ichidan: true, tadoushi: true }),
   w('大きい', 'おおきい', 'ookii', 'N5', 'adjective', [{ id: 'besar', en: 'big' }], [{ japanese: '大きい犬ですね。', id: 'Anjing yang besar ya.', en: 'What a big dog.' }]),
   w('小さい', 'ちいさい', 'chiisai', 'N5', 'adjective', [{ id: 'kecil', en: 'small' }], [{ japanese: '小さい箱です。', id: 'Ini kotak kecil.', en: 'It is a small box.' }]),
   w('新しい', 'あたらしい', 'atarashii', 'N5', 'adjective', [{ id: 'baru', en: 'new' }], [{ japanese: '新しい車を買いました。', id: 'Saya membeli mobil baru.', en: 'I bought a new car.' }]),
@@ -59,18 +79,18 @@ export const SEED_WORDS: readonly SeedWord[] = [
   w('本', 'ほん', 'hon', 'N5', 'noun', [{ id: 'buku', en: 'book' }], [{ japanese: '本を読みます。', id: 'Saya membaca buku.', en: 'I read a book.' }]),
   w('日本語', 'にほんご', 'nihongo', 'N5', 'noun', [{ id: 'bahasa Jepang', en: 'Japanese (language)' }], [{ japanese: '日本語を勉強しています。', id: 'Saya belajar bahasa Jepang.', en: 'I study Japanese.' }]),
   w('漢字', 'かんじ', 'kanji', 'N5', 'noun', [{ id: 'kanji', en: 'kanji characters' }], [{ japanese: '漢字を書きます。', id: 'Saya menulis kanji.', en: 'I write kanji.' }]),
-  w('書く', 'かく', 'kaku', 'N5', 'verb', [{ id: 'menulis', en: 'to write' }], [{ japanese: '名前を書いてください。', id: 'Tolong tulis nama.', en: 'Please write your name.' }]),
-  w('読む', 'よむ', 'yomu', 'N5', 'verb', [{ id: 'membaca', en: 'to read' }], [{ japanese: '新聞を読みます。', id: 'Saya membaca koran.', en: 'I read the newspaper.' }]),
-  w('聞く', 'きく', 'kiku', 'N5', 'verb', [{ id: 'mendengar/menanyakan', en: 'to listen/ask' }], [{ japanese: '音楽を聞きます。', id: 'Saya mendengarkan musik.', en: 'I listen to music.' }]),
-  w('話す', 'はなす', 'hanasu', 'N5', 'verb', [{ id: 'berbicara', en: 'to speak' }], [{ japanese: '日本語を話します。', id: 'Saya berbicara bahasa Jepang.', en: 'I speak Japanese.' }]),
-  w('作る', 'つくる', 'tsukuru', 'N5', 'verb', [{ id: 'membuat', en: 'to make' }], [{ japanese: '料理を作ります。', id: 'Saya memasak.', en: 'I cook (make a meal).' }]),
-  w('買う', 'かう', 'kau', 'N5', 'verb', [{ id: 'membeli', en: 'to buy' }], [{ japanese: 'パンを買います。', id: 'Saya membeli roti.', en: 'I buy bread.' }]),
+  w('書く', 'かく', 'kaku', 'N5', 'verb', [{ id: 'menulis', en: 'to write' }], [{ japanese: '名前を書いてください。', id: 'Tolong tulis nama.', en: 'Please write your name.' }], { godan: true, tadoushi: true, verbColloc: true }),
+  w('読む', 'よむ', 'yomu', 'N5', 'verb', [{ id: 'membaca', en: 'to read' }], [{ japanese: '新聞を読みます。', id: 'Saya membaca koran.', en: 'I read the newspaper.' }], { godan: true, tadoushi: true, verbColloc: true }),
+  w('聞く', 'きく', 'kiku', 'N5', 'verb', [{ id: 'mendengar/menanyakan', en: 'to listen/ask' }], [{ japanese: '音楽を聞きます。', id: 'Saya mendengarkan musik.', en: 'I listen to music.' }], { godan: true, tadoushi: true }),
+  w('話す', 'はなす', 'hanasu', 'N5', 'verb', [{ id: 'berbicara', en: 'to speak' }], [{ japanese: '日本語を話します。', id: 'Saya berbicara bahasa Jepang.', en: 'I speak Japanese.' }], { godan: true, tadoushi: true }),
+  w('作る', 'つくる', 'tsukuru', 'N5', 'verb', [{ id: 'membuat', en: 'to make' }], [{ japanese: '料理を作ります。', id: 'Saya memasak.', en: 'I cook (make a meal).' }], { godan: true, tadoushi: true, verbColloc: true }),
+  w('買う', 'かう', 'kau', 'N5', 'verb', [{ id: 'membeli', en: 'to buy' }], [{ japanese: 'パンを買います。', id: 'Saya membeli roti.', en: 'I buy bread.' }], { godan: true, tadoushi: true, verbColloc: true }),
   w('電車', 'でんしゃ', 'densha', 'N5', 'noun', [{ id: 'kereta listrik', en: 'train' }], [{ japanese: '電車で行きます。', id: 'Saya pergi naik kereta.', en: 'I go by train.' }]),
   w('駅', 'えき', 'eki', 'N5', 'noun', [{ id: 'stasiun', en: 'station' }], [{ japanese: '駅まで歩きます。', id: 'Saya berjalan ke stasiun.', en: 'I walk to the station.' }]),
   w('時間', 'じかん', 'jikan', 'N5', 'noun', [{ id: 'waktu', en: 'time' }], [{ japanese: '時間がありません。', id: 'Saya tidak punya waktu.', en: 'I have no time.' }]),
   w('今日', 'きょう', 'kyō', 'N5', 'noun', [{ id: 'hari ini', en: 'today' }], [{ japanese: '今日は暑いです。', id: 'Hari ini panas.', en: 'It is hot today.' }]),
   w('明日', 'あした', 'ashita', 'N5', 'noun', [{ id: 'besok', en: 'tomorrow' }], [{ japanese: '明日は休みます。', id: 'Besok saya libur.', en: 'Tomorrow I rest.' }]),
-  w('働く', 'はたらく', 'hataraku', 'N5', 'verb', [{ id: 'bekerja', en: 'to work' }], [{ japanese: '会社で働きます。', id: 'Saya bekerja di kantor.', en: 'I work at a company.' }]),
+  w('働く', 'はたらく', 'hataraku', 'N5', 'verb', [{ id: 'bekerja', en: 'to work' }], [{ japanese: '会社で働きます。', id: 'Saya bekerja di kantor.', en: 'I work at a company.' }], { godan: true, jidoushi: true }),
 ];
 
 export interface SeedDeck {
@@ -85,6 +105,7 @@ export const SEED_DECKS: readonly SeedDeck[] = [
       title: 'Kata Kerja Dasar',
       subtitle: 'Verba harian N5',
       jlptLevel: 'N5',
+      jftBasic: false,
       orderIndex: 0,
       isPublished: true,
       createdBy: '00000000-0000-0000-0000-000000000001',
@@ -99,6 +120,7 @@ export const SEED_DECKS: readonly SeedDeck[] = [
       title: 'Kata Benda Sehari-hari',
       subtitle: 'Nomina sekitar kita',
       jlptLevel: 'N5',
+      jftBasic: false,
       orderIndex: 1,
       isPublished: true,
       createdBy: '00000000-0000-0000-0000-000000000001',
@@ -113,6 +135,7 @@ export const SEED_DECKS: readonly SeedDeck[] = [
       title: 'Kata Sifat N5',
       subtitle: 'Adjektiva dasar',
       jlptLevel: 'N5',
+      jftBasic: false,
       orderIndex: 2,
       isPublished: true,
       createdBy: '00000000-0000-0000-0000-000000000001',
@@ -137,7 +160,16 @@ export function buildSeedDocs(): {
       hiragana: s.input.hiragana,
       romaji: s.input.romaji ?? null,
       jlptLevel: s.input.jlptLevel ?? null,
+      jftBasic: false,
       partOfSpeech: s.input.partOfSpeech ?? null,
+      godanVerb: s.input.godanVerb ?? false,
+      ichidanVerb: s.input.ichidanVerb ?? false,
+      fukisoku: s.input.fukisoku ?? false,
+      iAdjective: s.input.iAdjective ?? false,
+      naAdjective: s.input.naAdjective ?? false,
+      jidoushi: s.input.jidoushi ?? false,
+      tadoushi: s.input.tadoushi ?? false,
+      verbCollocation: s.input.verbCollocation ?? false,
       isActive: true,
     };
     const translations: Record<string, string> = {};

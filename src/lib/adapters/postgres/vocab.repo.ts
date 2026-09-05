@@ -13,6 +13,7 @@ import type {
   Deck,
   DirectionThreshold,
   JlptLevel,
+  PartOfSpeech,
   ReviewLog,
   Role,
   RoleChange,
@@ -54,11 +55,39 @@ function toDeck(r: typeof decks.$inferSelect): Deck {
     title: r.title,
     subtitle: r.subtitle,
     jlptLevel: r.jlptLevel as JlptLevel | null,
+    jftBasic: r.jftBasic,
     orderIndex: r.orderIndex,
     isPublished: r.isPublished,
     createdBy: r.createdBy,
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
+  };
+}
+
+const PARTS_OF_SPEECH = ['noun', 'verb', 'adverb', 'adjective', 'conjunction', 'demonstrative'] as const;
+
+function toPartOfSpeech(s: string | null): PartOfSpeech | null {
+  return s && (PARTS_OF_SPEECH as readonly string[]).includes(s) ? (s as PartOfSpeech) : null;
+}
+
+type VocabRow = typeof vocabulary.$inferSelect;
+type VocabGrammarFlags = Pick<
+  VocabRow,
+  | 'godanVerb' | 'ichidanVerb' | 'fukisoku'
+  | 'iAdjective' | 'naAdjective'
+  | 'jidoushi' | 'tadoushi' | 'verbCollocation'
+>;
+
+function vocabGrammar(r: VocabGrammarFlags) {
+  return {
+    godanVerb: r.godanVerb,
+    ichidanVerb: r.ichidanVerb,
+    fukisoku: r.fukisoku,
+    iAdjective: r.iAdjective,
+    naAdjective: r.naAdjective,
+    jidoushi: r.jidoushi,
+    tadoushi: r.tadoushi,
+    verbCollocation: r.verbCollocation,
   };
 }
 
@@ -142,7 +171,9 @@ async function buildWords(db: Db, ids: number[]): Promise<WordCard[]> {
       hiragana: v.hiragana,
       romaji: v.romaji,
       jlptLevel: v.jlptLevel as JlptLevel | null,
-      partOfSpeech: v.partOfSpeech,
+      jftBasic: v.jftBasic,
+      partOfSpeech: toPartOfSpeech(v.partOfSpeech),
+      ...vocabGrammar(v),
       isActive: v.isActive,
     },
     translations: transByVocab.get(v.id) ?? {},
@@ -319,7 +350,8 @@ export class PostgresVocabRepo implements VocabRepository {
       ? {
           id: rows[0].id, kanji: rows[0].kanji, hiragana: rows[0].hiragana,
           romaji: rows[0].romaji, jlptLevel: rows[0].jlptLevel as JlptLevel | null,
-          partOfSpeech: rows[0].partOfSpeech, isActive: rows[0].isActive,
+          jftBasic: rows[0].jftBasic, partOfSpeech: toPartOfSpeech(rows[0].partOfSpeech), ...vocabGrammar(rows[0]),
+          isActive: rows[0].isActive,
         }
       : null;
   }
@@ -342,7 +374,16 @@ export class PostgresVocabRepo implements VocabRepository {
         hiragana: input.hiragana,
         romaji: input.romaji ?? null,
         jlptLevel: (input.jlptLevel as JlptLevel | null) ?? null,
-        partOfSpeech: input.partOfSpeech ?? null,
+        jftBasic: input.jftBasic ?? false,
+        partOfSpeech: (input.partOfSpeech as PartOfSpeech | null) ?? null,
+        godanVerb: input.godanVerb ?? false,
+        ichidanVerb: input.ichidanVerb ?? false,
+        fukisoku: input.fukisoku ?? false,
+        iAdjective: input.iAdjective ?? false,
+        naAdjective: input.naAdjective ?? false,
+        jidoushi: input.jidoushi ?? false,
+        tadoushi: input.tadoushi ?? false,
+        verbCollocation: input.verbCollocation ?? false,
         createdBy,
       })
       .returning();
@@ -370,7 +411,7 @@ export class PostgresVocabRepo implements VocabRepository {
     }
     return {
       id: v.id, kanji: v.kanji, hiragana: v.hiragana, romaji: v.romaji,
-      jlptLevel: v.jlptLevel as JlptLevel | null, partOfSpeech: v.partOfSpeech, isActive: v.isActive,
+      jlptLevel: v.jlptLevel as JlptLevel | null, jftBasic: v.jftBasic, partOfSpeech: toPartOfSpeech(v.partOfSpeech), ...vocabGrammar(v), isActive: v.isActive,
     };
   }
 
@@ -381,7 +422,16 @@ export class PostgresVocabRepo implements VocabRepository {
     if (patch.hiragana !== undefined) set.hiragana = patch.hiragana;
     if (patch.romaji !== undefined) set.romaji = patch.romaji ?? null;
     if (patch.jlptLevel !== undefined) set.jlptLevel = (patch.jlptLevel as JlptLevel | null) ?? null;
+    if (patch.jftBasic !== undefined) set.jftBasic = patch.jftBasic;
     if (patch.partOfSpeech !== undefined) set.partOfSpeech = patch.partOfSpeech ?? null;
+    if (patch.godanVerb !== undefined) set.godanVerb = patch.godanVerb;
+    if (patch.ichidanVerb !== undefined) set.ichidanVerb = patch.ichidanVerb;
+    if (patch.fukisoku !== undefined) set.fukisoku = patch.fukisoku;
+    if (patch.iAdjective !== undefined) set.iAdjective = patch.iAdjective;
+    if (patch.naAdjective !== undefined) set.naAdjective = patch.naAdjective;
+    if (patch.jidoushi !== undefined) set.jidoushi = patch.jidoushi;
+    if (patch.tadoushi !== undefined) set.tadoushi = patch.tadoushi;
+    if (patch.verbCollocation !== undefined) set.verbCollocation = patch.verbCollocation;
     const rows = Object.keys(set).length > 0
       ? await db.update(vocabulary).set(set).where(eq(vocabulary.id, id)).returning()
       : await db.select().from(vocabulary).where(eq(vocabulary.id, id)).limit(1);
@@ -394,7 +444,7 @@ export class PostgresVocabRepo implements VocabRepository {
     return rows[0]
       ? {
           id: rows[0].id, kanji: rows[0].kanji, hiragana: rows[0].hiragana, romaji: rows[0].romaji,
-          jlptLevel: rows[0].jlptLevel as JlptLevel | null, partOfSpeech: rows[0].partOfSpeech, isActive: rows[0].isActive,
+          jlptLevel: rows[0].jlptLevel as JlptLevel | null, jftBasic: rows[0].jftBasic, partOfSpeech: toPartOfSpeech(rows[0].partOfSpeech), ...vocabGrammar(rows[0]), isActive: rows[0].isActive,
         }
       : null;
   }
@@ -417,13 +467,14 @@ export class PostgresVocabRepo implements VocabRepository {
     return rows[0] ? toDeck(rows[0]) : null;
   }
 
-  async createDeck(input: { title: string; subtitle?: string | null; jlptLevel?: JlptLevel | null; orderIndex: number; isPublished?: boolean }, createdBy: string | null): Promise<Deck> {
+  async createDeck(input: { title: string; subtitle?: string | null; jlptLevel?: JlptLevel | null; jftBasic?: boolean; orderIndex: number; isPublished?: boolean }, createdBy: string | null): Promise<Deck> {
     const rows = await getDb()
       .insert(decks)
       .values({
         title: input.title,
         subtitle: input.subtitle ?? null,
         jlptLevel: (input.jlptLevel as JlptLevel | null) ?? null,
+        jftBasic: input.jftBasic ?? false,
         orderIndex: input.orderIndex,
         isPublished: input.isPublished ?? false,
         createdBy,
@@ -432,11 +483,12 @@ export class PostgresVocabRepo implements VocabRepository {
     return toDeck(rows[0]);
   }
 
-  async updateDeck(id: number, patch: Partial<{ title: string; subtitle?: string | null; jlptLevel?: JlptLevel | null; orderIndex: number; isPublished?: boolean }>): Promise<Deck | null> {
+  async updateDeck(id: number, patch: Partial<{ title: string; subtitle?: string | null; jlptLevel?: JlptLevel | null; jftBasic?: boolean; orderIndex: number; isPublished?: boolean }>): Promise<Deck | null> {
     const set: Partial<typeof decks.$inferInsert> = {};
     if (patch.title !== undefined) set.title = patch.title;
     if (patch.subtitle !== undefined) set.subtitle = patch.subtitle ?? null;
     if (patch.jlptLevel !== undefined) set.jlptLevel = (patch.jlptLevel as JlptLevel | null) ?? null;
+    if (patch.jftBasic !== undefined) set.jftBasic = patch.jftBasic;
     if (patch.orderIndex !== undefined) set.orderIndex = patch.orderIndex;
     if (patch.isPublished !== undefined) set.isPublished = patch.isPublished;
     const rows = await getDb().update(decks).set(set).where(eq(decks.id, id)).returning();

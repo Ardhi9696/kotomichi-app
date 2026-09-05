@@ -11,6 +11,7 @@ import type {
   Deck,
   DirectionThreshold,
   JlptLevel,
+  PartOfSpeech,
   ReviewLog,
   Role,
   RoleChange,
@@ -25,7 +26,16 @@ export interface TagWithVocabInput {
   hiragana: string;
   romaji?: string | null;
   jlptLevel?: JlptLevel | null;
-  partOfSpeech?: string | null;
+  jftBasic?: boolean;
+  partOfSpeech?: PartOfSpeech | null;
+  godanVerb?: boolean;
+  ichidanVerb?: boolean;
+  fukisoku?: boolean;
+  iAdjective?: boolean;
+  naAdjective?: boolean;
+  jidoushi?: boolean;
+  tadoushi?: boolean;
+  verbCollocation?: boolean;
   translations: { locale: string; meaning: string }[];
   examples?: { japanese: string; translations: { locale: string; translation: string }[] }[];
   collocations?: { collocation: string; meaning?: string | null }[];
@@ -35,6 +45,7 @@ export interface DeckInput {
   title: string;
   subtitle?: string | null;
   jlptLevel?: JlptLevel | null;
+  jftBasic?: boolean;
   orderIndex: number;
   isPublished?: boolean;
 }

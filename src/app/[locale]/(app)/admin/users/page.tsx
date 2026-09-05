@@ -39,7 +39,7 @@ export default async function AdminUsersPage({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <AddUserDialog />
-          <Link href="/admin" className="btn-secondary">← {t('manageContent')}</Link>
+          <Link href="/admin/content" className="btn-secondary">← {t('manageContent')}</Link>
         </div>
       </section>
 

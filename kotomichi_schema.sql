@@ -49,7 +49,19 @@ CREATE TABLE IF NOT EXISTS vocabulary (
     romaji          TEXT,
     jlpt_level      TEXT
                     CHECK (jlpt_level IN ('N5', 'N4', 'N3', 'N2', 'N1')),
-    part_of_speech  TEXT,
+    jft_basic       BOOLEAN     NOT NULL DEFAULT FALSE,
+    part_of_speech  TEXT
+                    CHECK (part_of_speech IS NULL OR part_of_speech IN
+                           ('noun', 'verb', 'adverb', 'adjective',
+                            'conjunction', 'demonstrative')),
+    godan_verb      BOOLEAN     NOT NULL DEFAULT FALSE,
+    ichidan_verb    BOOLEAN     NOT NULL DEFAULT FALSE,
+    fukisoku        BOOLEAN     NOT NULL DEFAULT FALSE,
+    i_adjective     BOOLEAN     NOT NULL DEFAULT FALSE,
+    na_adjective    BOOLEAN     NOT NULL DEFAULT FALSE,
+    jidoushi        BOOLEAN     NOT NULL DEFAULT FALSE,
+    tadoushi        BOOLEAN     NOT NULL DEFAULT FALSE,
+    verb_collocation BOOLEAN    NOT NULL DEFAULT FALSE,
     is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
     created_by      UUID        REFERENCES user_profile (id),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -106,6 +118,7 @@ CREATE TABLE IF NOT EXISTS decks (
     title           TEXT        NOT NULL,
     subtitle        TEXT,
     jlpt_level      TEXT        CHECK (jlpt_level IN ('N5', 'N4', 'N3', 'N2', 'N1')),
+    jft_basic       BOOLEAN     NOT NULL DEFAULT FALSE,
     order_index     INT         NOT NULL DEFAULT 0,
     is_published    BOOLEAN     NOT NULL DEFAULT FALSE,
     created_by      UUID        REFERENCES user_profile (id),

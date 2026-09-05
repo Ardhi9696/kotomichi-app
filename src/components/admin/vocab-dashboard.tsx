@@ -3,9 +3,9 @@
 import { useState } from 'react';
 
 import { VocabFormModal } from '@/components/vocab-form-modal';
-import type { WordCard } from '@/lib/domain';
+import type { Deck, WordCard } from '@/lib/domain';
 
-export function VocabDashboard({ words }: { words: WordCard[] }) {
+export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Deck[] }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -31,7 +31,7 @@ export function VocabDashboard({ words }: { words: WordCard[] }) {
         ))}
       </div>
 
-      <VocabFormModal open={open} onClose={() => setOpen(false)} />
+      <VocabFormModal open={open} onClose={() => setOpen(false)} decks={decks} />
     </div>
   );
 }

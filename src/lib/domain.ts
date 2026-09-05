@@ -35,14 +35,35 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export type PartOfSpeech =
+  | 'noun'
+  | 'verb'
+  | 'adverb'
+  | 'adjective'
+  | 'conjunction'
+  | 'demonstrative';
+
 export interface Vocabulary {
   id: number;
   kanji: string | null;
   hiragana: string;
   romaji?: string | null;
   jlptLevel?: JlptLevel | null;
-  partOfSpeech?: string | null;
+  jftBasic: boolean;
+  partOfSpeech?: PartOfSpeech | null;
   isActive: boolean;
+  /** verb conjugation family (V) */
+  godanVerb: boolean;
+  ichidanVerb: boolean;
+  fukisoku: boolean;
+  /** adjective family (Adj) */
+  iAdjective: boolean;
+  naAdjective: boolean;
+  /** transitivity (V) */
+  jidoushi: boolean;
+  tadoushi: boolean;
+  /** whether this word carries verb collocations */
+  verbCollocation: boolean;
 }
 
 export interface VocabularyTranslation {
@@ -79,6 +100,7 @@ export interface Deck {
   title: string;
   subtitle: string | null;
   jlptLevel: JlptLevel | null;
+  jftBasic: boolean;
   orderIndex: number;
   isPublished: boolean;
   createdBy: string | null;

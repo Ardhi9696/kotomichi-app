@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 
 export type FlashVariant = 'success' | 'error';
 
@@ -51,15 +50,12 @@ export function FlashProvider({ children }: { children: React.ReactNode }) {
 }
 
 function FlashRegion({ items, onDismiss }: { items: FlashItem[]; onDismiss: (id: number) => void }) {
-  if (typeof document === 'undefined') return null;
-
-  return createPortal(
+  return (
     <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-72 flex-col gap-2" aria-live="polite">
       {items.map((item) => (
         <FlashToast key={item.id} item={item} onDismiss={onDismiss} />
       ))}
-    </div>,
-    document.body,
+    </div>
   );
 }
 

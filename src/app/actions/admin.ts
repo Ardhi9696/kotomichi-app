@@ -4,12 +4,47 @@ import { revalidatePath } from 'next/cache';
 
 import { requireRole } from '@/lib/server/dal';
 import { getAuthProvider, getRepository } from '@/lib/server/runtime';
-import type { JlptLevel, Role, UserProfile } from '@/lib/domain';
+import type { JlptLevel, PartOfSpeech, Role, UserProfile } from '@/lib/domain';
 import type { TagWithVocabInput } from '@/lib/ports/db-port';
+
+function partOfSpeechValue(value: string | null): PartOfSpeech | null {
+  const v = String(value ?? '');
+  return v && ['noun','verb','adverb','adjective','conjunction','demonstrative'].includes(v)
+    ? (v as PartOfSpeech)
+    : null;
+}
+
+function checkOn(formData: FormData, name: string): boolean {
+  return formData.get(name) === 'on';
+}
+
+function grammarFlagsAll(formData: FormData) {
+  const verbType = String(formData.get('verbType') ?? '');
+  const transitivity = String(formData.get('transitivity') ?? '');
+  const adjectiveType = String(formData.get('adjectiveType') ?? '');
+  return {
+    godanVerb: verbType === 'godan',
+    ichidanVerb: verbType === 'ichidan',
+    fukisoku: verbType === 'fukisoku',
+    iAdjective: adjectiveType === 'i',
+    naAdjective: adjectiveType === 'na',
+    jidoushi: transitivity === 'jidoushi' || transitivity === 'both',
+    tadoushi: transitivity === 'tadoushi' || transitivity === 'both',
+    verbCollocation: checkOn(formData, 'verbCollocation'),
+  };
+}
 
 function jlpt(value: string | null): JlptLevel | null {
   const v = String(value ?? '');
   return v && ['N1','N2','N3','N4','N5'].includes(v) ? (v as JlptLevel) : null;
+}
+
+/** jftBasic (checkbox 'on') is equivalent to JLPT N4, so the level is fixed. */
+function jlptWithJft(formData: FormData): { jlptLevel: JlptLevel | null; jftBasic: boolean } {
+  const jftBasic = formData.get('jftBasic') === 'on';
+  return jftBasic
+    ? { jlptLevel: 'N4', jftBasic: true }
+    : { jlptLevel: jlpt(formData.get('jlptLevel') as string | null), jftBasic: false };
 }
 
 function parseTranslations(formData: FormData): { locale: string; meaning: string }[] {
@@ -39,7 +74,7 @@ export async function createVocabularyAction(formData: FormData): Promise<void> 
 
   const romaji = String(formData.get('romaji') ?? '').trim() || null;
   const kanji = String(formData.get('kanji') ?? '').trim() || null;
-  const partOfSpeech = String(formData.get('partOfSpeech') ?? '').trim() || null;
+  const partOfSpeech = partOfSpeechValue(formData.get('partOfSpeech') as string | null);
   const translations = parseTranslations(formData);
 
   const examples: TagWithVocabInput['examples'] = [];
@@ -62,11 +97,22 @@ export async function createVocabularyAction(formData: FormData): Promise<void> 
     });
   }
 
-  await repo.createVocabulary(
-    { kanji, hiragana, romaji, jlptLevel: jlpt(formData.get('jlptLevel') as string | null), partOfSpeech, translations, examples, collocations },
+  const jft = jlptWithJft(formData);
+
+  const deckIds = formData
+    .getAll('deckIds')
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  const created = await repo.createVocabulary(
+    { kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
+      ...grammarFlagsAll(formData), translations, examples, collocations },
     null,
   );
-  revalidatePath('/admin');
+  for (const deckId of deckIds) {
+    await repo.addVocabularyToDeck(deckId, created.id);
+  }
+  revalidatePath('/admin/content');
 }
 
 export async function upsertVocabularyAction(formData: FormData): Promise<void> {
@@ -79,25 +125,29 @@ export async function upsertVocabularyAction(formData: FormData): Promise<void> 
 
   const romaji = String(formData.get('romaji') ?? '').trim() || null;
   const kanji = String(formData.get('kanji') ?? '').trim() || null;
-  const partOfSpeech = String(formData.get('partOfSpeech') ?? '').trim() || null;
+  const partOfSpeech = partOfSpeechValue(formData.get('partOfSpeech') as string | null);
   const translations = parseTranslations(formData);
+
+  const jft = jlptWithJft(formData);
 
   if (Number.isFinite(id) && id > 0) {
     await repo.updateVocabulary(id, {
-      kanji, hiragana, romaji, jlptLevel: jlpt(formData.get('jlptLevel') as string | null), partOfSpeech, translations,
+      kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
+      ...grammarFlagsAll(formData), translations,
     });
   } else {
     await repo.createVocabulary(
-      { kanji, hiragana, romaji, jlptLevel: jlpt(formData.get('jlptLevel') as string | null), partOfSpeech, translations },
+      { kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
+        ...grammarFlagsAll(formData), translations },
       null,
     );
   }
-  revalidatePath('/admin');
+  revalidatePath('/admin/content');
 }
 
 export async function removeVocabularyAction(_formData: FormData): Promise<void> {
   await requireRole('admin', 'super_admin');
-  revalidatePath('/admin');
+  revalidatePath('/admin/content');
 }
 
 export async function createDeckAction(formData: FormData): Promise<void> {
@@ -105,17 +155,21 @@ export async function createDeckAction(formData: FormData): Promise<void> {
   const repo = await getRepository();
   const title = String(formData.get('title') ?? '').trim();
   if (!title) throw new Error('Deck title is required');
+  const jft = jlptWithJft(formData);
+  const existing = await repo.listDecks();
+  const orderIndex = existing.reduce((max, d) => Math.max(max, d.orderIndex), -1) + 1;
   await repo.createDeck(
     {
       title,
       subtitle: String(formData.get('subtitle') ?? '').trim() || null,
-      jlptLevel: jlpt(formData.get('jlptLevel') as string | null),
-      orderIndex: Number(formData.get('orderIndex') ?? Date.now()),
+      jlptLevel: jft.jlptLevel,
+      jftBasic: jft.jftBasic,
+      orderIndex,
       isPublished: formData.get('published') === 'on',
     },
     null,
   );
-  revalidatePath('/admin');
+  revalidatePath('/admin/content');
 }
 
 export async function updateDeckAction(formData: FormData): Promise<void> {
@@ -123,13 +177,14 @@ export async function updateDeckAction(formData: FormData): Promise<void> {
   const repo = await getRepository();
   const id = Number(formData.get('id'));
   if (!Number.isFinite(id) || id <= 0) throw new Error('Invalid deck id');
+  const jft = jlptWithJft(formData);
   await repo.updateDeck(id, {
     title: String(formData.get('title') ?? '').trim() || undefined,
     subtitle: String(formData.get('subtitle') ?? '').trim() || null,
-    jlptLevel: jlpt(formData.get('jlptLevel') as string | null),
-    isPublished: formData.get('published') === 'on',
+    jlptLevel: jft.jlptLevel,
+    jftBasic: jft.jftBasic,
   });
-  revalidatePath('/admin');
+  revalidatePath('/admin/content');
 }
 
 export async function togglePublishAction(formData: FormData): Promise<void> {
@@ -138,7 +193,7 @@ export async function togglePublishAction(formData: FormData): Promise<void> {
   const id = Number(formData.get('id'));
   const published = formData.get('published') === 'on';
   if (Number.isFinite(id) && id > 0) await repo.updateDeck(id, { isPublished: published });
-  revalidatePath('/admin');
+  revalidatePath('/admin/content');
 }
 
 export async function setUserRoleAction(formData: FormData): Promise<void> {
