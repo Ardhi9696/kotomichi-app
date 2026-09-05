@@ -69,6 +69,7 @@ export function buildStudyCard(opts: {
     kanji: word.vocabulary.kanji,
     hiragana: word.vocabulary.hiragana,
     romaji: word.vocabulary.romaji ?? null,
+    partOfSpeech: word.vocabulary.partOfSpeech ?? null,
     meanings: pickMeaning(word, locale),
     exampleJapanese: examples?.japanese ?? null,
     exampleMeaning: pickExampleTranslation(examples, locale),

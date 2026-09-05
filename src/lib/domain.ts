@@ -193,6 +193,7 @@ export interface StudyCard {
   kanji: string | null;
   hiragana: string;
   romaji: string | null;
+  partOfSpeech?: PartOfSpeech | null;
   meanings: string[]; // preferred-locale meanings, fallback to any
   exampleJapanese: string | null;
   exampleMeaning: string | null;

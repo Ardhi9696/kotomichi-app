@@ -45,8 +45,24 @@ import { getDb } from '@/lib/adapters/postgres/db';
 
 type Db = ReturnType<typeof getDb>;
 
-const iso = (d: Date): string => d.toISOString();
-const isoOrNull = (d: Date | null): string | null => (d ? iso(d) : null);
+const iso = (d: Date | string | number): string => {
+  if (d instanceof Date) return d.toISOString();
+  if (typeof d === 'string') {
+    const parsed = new Date(d);
+    return Number.isNaN(parsed.getTime()) ? d : parsed.toISOString();
+  }
+  return new Date(d).toISOString();
+};
+const isoOrNull = (d: Date | string | number | null | undefined): string | null => {
+  if (!d) return null;
+  if (d instanceof Date) return d.toISOString();
+  if (typeof d === 'string') {
+    const parsed = new Date(d);
+    return Number.isNaN(parsed.getTime()) ? d : parsed.toISOString();
+  }
+  const parsed = new Date(d);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+};
 const dayKey = (s: string | null): string | null => (s ? s.slice(0, 10) : null);
 
 function toDeck(r: typeof decks.$inferSelect): Deck {
@@ -317,10 +333,14 @@ export class PostgresVocabRepo implements VocabRepository {
       .from(userProfile)
       .where(inArray(userProfile.id, userIds));
     const map: Record<string, string> = {};
-    for (const r of reviewRows) map[r.userId] = iso(r.last);
+    for (const r of reviewRows) {
+      const isoLast = isoOrNull(r.last);
+      if (isoLast) map[r.userId] = isoLast;
+    }
     for (const r of seenRows) {
       if (!r.seen) continue;
-      const isoSeen = iso(r.seen);
+      const isoSeen = isoOrNull(r.seen);
+      if (!isoSeen) continue;
       if (!map[r.userId] || isoSeen > map[r.userId]) map[r.userId] = isoSeen;
     }
     return map;

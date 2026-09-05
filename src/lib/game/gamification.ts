@@ -98,8 +98,9 @@ export function nextStreak(
   return { streak, hitMilestone };
 }
 
-/** `YYYY-MM-DD` (UTC) for a Date. */
-export function dateKey(d: Date): string {
+/** `YYYY-MM-DD` (UTC) for a Date or date string. */
+export function dateKey(d: Date | string): string {
+  if (typeof d === 'string') return d.slice(0, 10);
   return d.toISOString().slice(0, 10);
 }
 

@@ -80,6 +80,7 @@ describe('expForReview', () => {
 describe('date helpers', () => {
   it('dateKey is UTC YYYY-MM-DD', () => {
     expect(dateKey(new Date('2026-09-05T12:00:00Z'))).toBe('2026-09-05');
+    expect(dateKey('2026-09-05T12:00:00Z')).toBe('2026-09-05');
   });
   it('daysAgoKey subtracts days', () => {
     expect(daysAgoKey(1, new Date('2026-09-05T00:00:00Z'))).toBe('2026-09-04');

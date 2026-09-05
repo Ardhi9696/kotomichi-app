@@ -5,12 +5,29 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 import { submitSelfCheckAction } from '@/app/actions/study';
-import type { StudyCard } from '@/lib/domain';
+import type { PartOfSpeech, StudyCard } from '@/lib/domain';
 
 const SWIPE_THRESHOLD = 64;
 
+function posLabel(t: ReturnType<typeof useTranslations<'learn'>>, pos: PartOfSpeech): string {
+  switch (pos) {
+    case 'noun':
+      return t('pos.noun');
+    case 'verb':
+      return t('pos.verb');
+    case 'adverb':
+      return t('pos.adverb');
+    case 'adjective':
+      return t('pos.adjective');
+    case 'conjunction':
+      return t('pos.conjunction');
+    case 'demonstrative':
+      return t('pos.demonstrative');
+  }
+}
+
 export function SelfCheckSession({
-  cards,
+  cards: initialCards,
   deckTitle,
   deckId,
 }: {
@@ -20,11 +37,13 @@ export function SelfCheckSession({
 }) {
   const t = useTranslations('learn');
   const common = useTranslations('common');
+  const [sessionCards, setSessionCards] = useState<StudyCard[]>(initialCards);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [remembered, setRemembered] = useState(0);
+  const [rememberedCards, setRememberedCards] = useState<StudyCard[]>([]);
+  const [forgottenCards, setForgottenCards] = useState<StudyCard[]>([]);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startX = useRef<number | null>(null);
@@ -36,14 +55,14 @@ export function SelfCheckSession({
     shownAt.current = Date.now();
   }, [index]);
 
-  const total = cards.length;
+  const total = sessionCards.length;
   const done = index >= total;
   const answered = Math.min(index, total);
   const progressPct = total === 0 ? 0 : Math.round((answered / total) * 100);
 
   const answer = async (correct: boolean) => {
     if (pending) return;
-    const card = cards[index];
+    const card = sessionCards[index];
     if (!card) return;
     const start = shownAt.current ?? Date.now();
     const elapsedMs = Date.now() - start;
@@ -66,31 +85,130 @@ export function SelfCheckSession({
       setError(common('error'));
       return;
     }
-    if (correct) setRemembered((r) => r + 1);
+    if (correct) {
+      setRememberedCards((prev) => [...prev, card]);
+    } else {
+      setForgottenCards((prev) => [...prev, card]);
+    }
     setIndex((i) => i + 1);
   };
 
+  const repeatForgotten = () => {
+    if (forgottenCards.length === 0) return;
+    setSessionCards(forgottenCards);
+    setIndex(0);
+    setFlipped(false);
+    setRememberedCards([]);
+    setForgottenCards([]);
+  };
+
+  const repeatAll = () => {
+    setSessionCards(initialCards);
+    setIndex(0);
+    setFlipped(false);
+    setRememberedCards([]);
+    setForgottenCards([]);
+  };
+
   if (done) {
-    const forgotten = total - remembered;
+    const rememberedCount = rememberedCards.length;
+    const forgottenCount = forgottenCards.length;
+
     return (
-      <div className="card flex flex-col items-center gap-4 p-10 text-center">
-        <p className="font-serif text-2xl text-ink-800 dark:text-washi-50">{t('done')}</p>
-        <p className="text-sm text-ink-500 dark:text-ink-400">
-          {t('result', { remembered, forgotten })}
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Link href={`/learn?deck=${deckId}`} className="btn-secondary">
-            {t('repeatDeck')}
-          </Link>
-          <Link href="/dashboard" className="btn-primary">
-            {t('backToDashboard')}
-          </Link>
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+        <div className="card flex flex-col items-center gap-3 p-8 text-center">
+          <p className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('done')}</p>
+          <p className="text-sm text-ink-500 dark:text-ink-400">
+            {t('result', { remembered: rememberedCount, forgotten: forgottenCount })}
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            {forgottenCount > 0 && (
+              <button
+                type="button"
+                onClick={repeatForgotten}
+                className="btn-primary"
+              >
+                ↺ {t('repeatForgotten')} ({forgottenCount})
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={repeatAll}
+              className="btn-secondary"
+            >
+              {t('repeatAll')}
+            </button>
+            <Link
+              href="/dashboard"
+              className={forgottenCount === 0 ? 'btn-primary' : 'btn-secondary'}
+            >
+              {t('finish')} → {t('backToDashboard')}
+            </Link>
+            <Link
+              href={`/learn?deck=${deckId}`}
+              className="btn-ghost text-xs text-ink-500 hover:text-ink-800 dark:hover:text-washi-50"
+            >
+              {t('repeatDeck')}
+            </Link>
+          </div>
+        </div>
+
+        {/* Summary lists of remembered and forgotten */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Forgotten / Belum Ingat */}
+          <div className="card flex flex-col gap-3 p-5 border-shu-500/20">
+            <div className="flex items-center justify-between border-b border-ink-100 pb-2 dark:border-ink-800">
+              <h3 className="font-serif font-bold text-shu-600 dark:text-shu-400">
+                {t('forgottenWords', { count: forgottenCount })}
+              </h3>
+              <span className="chip bg-shu-500/10 text-shu-600 dark:text-shu-400">
+                {forgottenCount}
+              </span>
+            </div>
+
+            {forgottenCount === 0 ? (
+              <p className="py-6 text-center text-xs text-ink-400 dark:text-ink-500">
+                {t('allRemembered')}
+              </p>
+            ) : (
+              <div className="flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">
+                {forgottenCards.map((c) => (
+                  <SummaryCardItem key={c.id} card={c} t={t} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Remembered / Sudah Ingat */}
+          <div className="card flex flex-col gap-3 p-5 border-emerald-500/20">
+            <div className="flex items-center justify-between border-b border-ink-100 pb-2 dark:border-ink-800">
+              <h3 className="font-serif font-bold text-emerald-600 dark:text-emerald-400">
+                {t('rememberedWords', { count: rememberedCount })}
+              </h3>
+              <span className="chip bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                {rememberedCount}
+              </span>
+            </div>
+
+            {rememberedCount === 0 ? (
+              <p className="py-6 text-center text-xs text-ink-400 dark:text-ink-500">
+                {t('noneRemembered')}
+              </p>
+            ) : (
+              <div className="flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">
+                {rememberedCards.map((c) => (
+                  <SummaryCardItem key={c.id} card={c} t={t} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
-  const card = cards[index];
+  const card = sessionCards[index];
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (pending) return;
@@ -176,20 +294,44 @@ export function SelfCheckSession({
               </p>
               <p className="text-sm text-ink-400">{t('fromHint')}</p>
             </div>
-            {/* Back */}
-            <div className="card absolute inset-0 flex flex-col items-center justify-center gap-3 p-10 text-center [transform:rotateY(180deg)] [backface-visibility:hidden]">
-              <p className="text-4xl font-semibold text-shu-500">{card.to}</p>
-              <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-ink-500 dark:text-ink-300">
-                {card.kanji && <span className="chip bg-ink-100 dark:bg-ink-800">{card.kanji}</span>}
-                {card.romaji && <span className="chip bg-ink-100 dark:bg-ink-800">{card.romaji}</span>}
+            {/* Back: shows Hiragana, Meaning (Arti), and Part of Speech */}
+            <div className="card absolute inset-0 flex flex-col items-center justify-center gap-3 p-8 text-center [transform:rotateY(180deg)] [backface-visibility:hidden]">
+              {/* Hiragana reading */}
+              <p className="text-3xl font-bold tracking-wide text-ink-900 dark:text-washi-50">
+                {card.hiragana}
+              </p>
+
+              {/* Meaning / Arti */}
+              <p className="text-2xl font-semibold text-shu-500">
+                {card.meanings?.length ? card.meanings.join(', ') : card.to}
+              </p>
+
+              {/* Tags: Part of speech, Kanji (if different), Romaji */}
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+                {card.partOfSpeech && (
+                  <span className="chip bg-kintsugi-500/15 font-medium text-kintsugi-600 dark:bg-kintsugi-500/20 dark:text-kintsugi-300">
+                    {posLabel(t, card.partOfSpeech)}
+                  </span>
+                )}
+                {card.kanji && card.kanji !== card.hiragana && (
+                  <span className="chip bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                    {card.kanji}
+                  </span>
+                )}
+                {card.romaji && (
+                  <span className="chip bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                    {card.romaji}
+                  </span>
+                )}
               </div>
+
               {card.exampleJapanese && (
-                <p className="mt-1 max-w-sm text-sm leading-relaxed text-ink-600 dark:text-ink-300">
-                  {card.exampleJapanese}
+                <div className="mt-2 max-w-sm rounded-lg bg-ink-50 px-3 py-2 text-left text-xs leading-relaxed text-ink-600 dark:bg-ink-800/50 dark:text-ink-300">
+                  <p className="font-medium text-ink-800 dark:text-ink-100">{card.exampleJapanese}</p>
                   {card.exampleMeaning && (
-                    <span className="mt-0.5 block text-ink-400">{card.exampleMeaning}</span>
+                    <p className="mt-0.5 text-ink-500 dark:text-ink-400">{card.exampleMeaning}</p>
                   )}
-                </p>
+                </div>
               )}
             </div>
           </div>
@@ -214,6 +356,40 @@ export function SelfCheckSession({
           {t('remember')}
         </button>
       </div>
+    </div>
+  );
+}
+
+function SummaryCardItem({
+  card,
+  t,
+}: {
+  card: StudyCard;
+  t: ReturnType<typeof useTranslations<'learn'>>;
+}) {
+  const primary = card.kanji ?? card.hiragana;
+  const showHiraganaSub = card.kanji && card.kanji !== card.hiragana;
+  const meaning = card.meanings?.length ? card.meanings.join(', ') : card.to;
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-ink-200/60 bg-washi-50/60 p-3 text-left transition-colors dark:border-ink-800 dark:bg-ink-900/40">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-bold text-ink-900 dark:text-washi-50">{primary}</span>
+          {showHiraganaSub && (
+            <span className="text-xs text-ink-500 dark:text-ink-400">({card.hiragana})</span>
+          )}
+          {card.partOfSpeech && (
+            <span className="chip px-1.5 py-0 text-[11px] bg-kintsugi-500/10 text-kintsugi-600 dark:bg-kintsugi-500/20 dark:text-kintsugi-300">
+              {posLabel(t, card.partOfSpeech)}
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 truncate text-xs text-ink-600 dark:text-ink-300">{meaning}</p>
+      </div>
+      {card.romaji && (
+        <span className="ml-2 shrink-0 text-xs text-ink-400 dark:text-ink-500">{card.romaji}</span>
+      )}
     </div>
   );
 }

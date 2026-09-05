@@ -49,7 +49,7 @@ export default async function LearnPage({
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
       </section>
 
-      <SelfCheckSession cards={cards} deckTitle={state.deck.title} deckId={state.deck.id} />
+      <SelfCheckSession key={state.deck.id} cards={cards} deckTitle={state.deck.title} deckId={state.deck.id} />
     </div>
   );
 }

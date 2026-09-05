@@ -8,7 +8,10 @@ export const ONLINE_WINDOW_MS = 2 * 60_000;
 /** After an hour we stop showing "N minutes ago". */
 const MINUTES_WINDOW = 60;
 
-const toDate = (iso: string): string => iso.slice(0, 16).replace('T', ' ');
+const toDate = (iso: string | Date): string => {
+  if (typeof iso === 'string') return iso.slice(0, 16).replace('T', ' ');
+  return iso.toISOString().slice(0, 16).replace('T', ' ');
+};
 
 export function formatLastActive(iso?: string | null, now: number = Date.now()): ActivityLabel | null {
   if (!iso) return null;
