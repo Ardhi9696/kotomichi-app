@@ -1,26 +1,101 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Dark mode via a `.dark` class on <html> (§8.2). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Kotomichi ink & paper palette — monochrome base with a Shu-iro (vermilion)
+   accent and kintsugi-gold highlights (§2.2). */
+@theme {
+  --color-washi-50: #faf7f0;
+  --color-washi-100: #f3eee2;
+  --color-washi-200: #e8dfcc;
+  --color-washi-300: #d8cab0;
+  --color-washi-400: #c2af8d;
+
+  --color-ink-950: #1a1a18;
+  --color-ink-900: #262623;
+  --color-ink-800: #33332e;
+  --color-ink-700: #4a4a44;
+  --color-ink-600: #63635c;
+  --color-ink-500: #7f7f76;
+  --color-ink-400: #9d9d93;
+  --color-ink-300: #bcbcb2;
+  --color-ink-200: #d7d7cf;
+  --color-ink-100: #ededE8;
+
+  --color-shu-500: #8f3a36;
+  --color-shu-400: #b04a3f;
+  --color-shu-300: #cf6152;
+  --color-shu-100: #f3dcd5;
+
+  --color-kintsugi-500: #c9a227;
+  --color-kintsugi-100: #f4e8c3;
+
+  --font-serif: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
+  --font-sans: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(26, 26, 24, 0.06), 0 6px 20px -8px rgba(26, 26, 24, 0.22);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--color-washi-100);
+    color: var(--color-ink-800);
+    -webkit-font-smoothing: antialiased;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    min-height: 100dvh;
+    background-image:
+      radial-gradient(1200px 500px at 85% -10%, rgba(143, 58, 54, 0.06), transparent 60%),
+      radial-gradient(900px 420px at -10% 110%, rgba(201, 162, 39, 0.07), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  .dark html,
+  .dark body {
+    background-color: var(--color-ink-950);
+    color: var(--color-ink-100);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .card {
+    @apply rounded-2xl border border-ink-200 bg-washi-50 shadow-card dark:border-ink-800 dark:bg-ink-900;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shu-500 disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shu-500 disabled:pointer-events-none disabled:opacity-50
+      bg-shu-500 text-washi-50 hover:bg-shu-400 active:scale-[0.99];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shu-500 disabled:pointer-events-none disabled:opacity-50
+      border border-ink-300 bg-washi-50 text-ink-700 hover:border-shu-400 hover:text-shu-500
+      dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all
+      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shu-500 disabled:pointer-events-none disabled:opacity-50
+      text-ink-600 hover:bg-ink-200/60 hover:text-ink-800 dark:text-ink-300 dark:hover:bg-ink-800 dark:hover:text-ink-100;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-ink-300 bg-washi-50 px-3 py-2 text-sm text-ink-800
+      placeholder:text-ink-400 focus:border-shu-400 focus:outline-none focus:ring-2 focus:ring-shu-400/30
+      dark:border-ink-700 dark:bg-ink-900 dark:text-ink-100 dark:placeholder:text-ink-500;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
 }
