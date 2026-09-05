@@ -4,6 +4,7 @@ import { getLocale, getMessages } from 'next-intl/server';
 
 import '../globals.css';
 import { ThemeScript } from '@/app/theme-script';
+import { ThemeProvider } from '@/app/theme-provider';
 
 export const metadata: Metadata = {
   title: 'Kotomichi — The Way of Words',
@@ -16,9 +17,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body className="min-h-dvh">
+      <head>
         <ThemeScript />
-        <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+      </head>
+      <body className="min-h-dvh">
+        <ThemeProvider>
+          <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
