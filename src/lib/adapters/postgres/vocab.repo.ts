@@ -303,7 +303,8 @@ export class PostgresVocabRepo implements VocabRepository {
 
   async getLastActivityForUsers(userIds: string[]): Promise<Record<string, string>> {
     if (userIds.length === 0) return {};
-    const rows = await getDb()
+    const db = getDb();
+    const reviewRows = await db
       .select({
         userId: reviewLog.userId,
         last: sql<Date>`max(${reviewLog.reviewedAt})`,
@@ -311,9 +312,25 @@ export class PostgresVocabRepo implements VocabRepository {
       .from(reviewLog)
       .where(inArray(reviewLog.userId, userIds))
       .groupBy(reviewLog.userId);
+    const seenRows = await db
+      .select({ userId: userProfile.id, seen: userProfile.lastSeenAt })
+      .from(userProfile)
+      .where(inArray(userProfile.id, userIds));
     const map: Record<string, string> = {};
-    for (const r of rows) map[r.userId] = iso(r.last);
+    for (const r of reviewRows) map[r.userId] = iso(r.last);
+    for (const r of seenRows) {
+      if (!r.seen) continue;
+      const isoSeen = iso(r.seen);
+      if (!map[r.userId] || isoSeen > map[r.userId]) map[r.userId] = isoSeen;
+    }
     return map;
+  }
+
+  async touchLastActivity(userId: string): Promise<void> {
+    await getDb()
+      .update(userProfile)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(userProfile.id, userId));
   }
 
   // ================= vocabulary content =================

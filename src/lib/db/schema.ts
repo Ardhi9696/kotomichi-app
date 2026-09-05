@@ -33,6 +33,7 @@ export const userProfile = pgTable('user_profile', {
   level: integer('level').notNull().default(1),
   exp: integer('exp').notNull().default(0),
   lastReviewDate: date_('last_review_date'),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
   currentStreak: integer('current_streak').notNull().default(0),
   longestStreak: integer('longest_streak').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

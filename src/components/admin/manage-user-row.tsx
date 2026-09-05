@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import { deleteUserAction, setUserRoleAction } from '@/app/actions/admin';
+import { ActivityLabel } from '@/components/activity-label';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { EditUserDialog } from '@/components/admin/edit-user-dialog';
 import type { Role } from '@/lib/domain';
@@ -49,8 +50,7 @@ export function ManageUserRow({
         <div className="min-w-0">
           <div className="truncate font-medium text-ink-800 dark:text-ink-100">{displayName}</div>
           <div className="text-xs text-ink-400">
-            {t('id')} {userId.slice(0, 8)} ·{' '}
-            {lastActive ? t('lastActive', { date: lastActive.slice(0, 16).replace('T', ' ') }) : t('neverActive')}
+            {t('id')} {userId.slice(0, 8)} · <ActivityLabel iso={lastActive} />
           </div>
         </div>
 

@@ -39,6 +39,7 @@ export class InMemoryVocabRepo implements VocabRepository {
   private deckMembership = new Map<number, number[]>();
   private progress = new Map<string, SrsProgress>();
   private logs = new Map<string, ReviewLog[]>();
+  private lastSeen = new Map<string, string>();
   private roleChanges: RoleChange[] = [];
   private nextRoleChangeId = 1;
   private config: AppConfig = structuredClone(DEFAULTS);
@@ -122,7 +123,15 @@ export class InMemoryVocabRepo implements VocabRepository {
       if (!wanted.has(uid) || logs.length === 0) continue;
       map[uid] = logs.reduce((max, l) => (l.reviewedAt > max ? l.reviewedAt : max), logs[0].reviewedAt);
     }
+    for (const [uid, seen] of this.lastSeen) {
+      if (!wanted.has(uid)) continue;
+      if (!map[uid] || seen > map[uid]) map[uid] = seen;
+    }
     return map;
+  }
+
+  async touchLastActivity(userId: string): Promise<void> {
+    this.lastSeen.set(userId, new Date().toISOString());
   }
 
   // ================= vocabulary content =================

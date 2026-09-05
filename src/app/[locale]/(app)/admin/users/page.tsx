@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { requireRole } from '@/lib/server/dal';
 import { getRepository } from '@/lib/server/runtime';
+import { ActivityLabel } from '@/components/activity-label';
 import { AddUserDialog } from '@/components/admin/add-user-dialog';
 import { ManageUserRow } from '@/components/admin/manage-user-row';
 import type { RoleChange, UserProfile } from '@/lib/domain';
@@ -70,10 +71,7 @@ export default async function AdminUsersPage({
                 <div className="min-w-0">
                   <div className="truncate font-medium text-ink-800 dark:text-ink-100">{u.displayName}</div>
                   <div className="text-xs text-ink-400">
-                    {t('id')} {u.id.slice(0, 8)} ·{' '}
-                    {activity[u.id]
-                      ? t('lastActive', { date: activity[u.id].slice(0, 16).replace('T', ' ') })
-                      : t('neverActive')}
+                    {t('id')} {u.id.slice(0, 8)} · <ActivityLabel iso={activity[u.id]} />
                   </div>
                 </div>
                 <span className="chip bg-kintsugi-100 text-kintsugi-500 dark:bg-ink-800 dark:text-kintsugi-500">

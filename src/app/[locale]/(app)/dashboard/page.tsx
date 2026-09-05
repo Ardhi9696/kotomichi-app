@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { getStudyContext } from '@/lib/server/dal';
 import { levelFromExp } from '@/lib/game/gamification';
+import { ActivityLabel } from '@/components/activity-label';
 import type { DeckWithProgress, Role } from '@/lib/domain';
 
 export const metadata: Metadata = { title: 'Dashboard — Kotomichi' };
@@ -233,9 +234,7 @@ async function AdminOverview({ currentRole }: { currentRole: Role }) {
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-ink-700 dark:text-ink-200">{u.displayName}</span>
                     <span className="text-xs text-ink-400">
-                      {activity[u.id]
-                        ? t('lastActive', { date: activity[u.id].slice(0, 16).replace('T', ' ') })
-                        : t('neverActive')}
+                      <ActivityLabel iso={activity[u.id]} />
                     </span>
                   </span>
                   <span className="chip bg-washi-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">{ROLE_LABEL[u.role]}</span>

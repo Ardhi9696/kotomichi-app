@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS user_profile (
     level               INT         NOT NULL DEFAULT 1,
     exp                 INT         NOT NULL DEFAULT 0,
     last_review_date    DATE,
+    last_seen_at        TIMESTAMPTZ,
     current_streak      INT         NOT NULL DEFAULT 0,
     longest_streak      INT         NOT NULL DEFAULT 0,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),

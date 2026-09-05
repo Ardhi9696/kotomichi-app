@@ -1,4 +1,5 @@
 import { AppHeader } from '@/components/app-header';
+import { ActivityHeartbeat } from '@/components/activity-heartbeat';
 import { FlashProvider } from '@/components/flash-provider';
 import { ProfileSync } from '@/components/profile-sync';
 import { getCurrentUser } from '@/lib/server/dal';
@@ -17,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <FlashProvider>
+      {current && <ActivityHeartbeat />}
       <div className="flex min-h-dvh flex-col">
         {profile && <ProfileSync theme={profile.theme} preferredLocale={profile.preferredLocale} />}
         <AppHeader signedIn={Boolean(current)} isAdmin={isAdmin} profile={profile} />

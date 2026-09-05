@@ -122,5 +122,10 @@ describe('InMemoryVocabRepo', () => {
     expect(activity[USER]).toBeTruthy();
     expect(activity[target]).toBeUndefined();
     expect(activity['missing-id']).toBeUndefined();
+
+    await repo.touchLastActivity(target);
+    const after = await repo.getLastActivityForUsers([target, USER, 'missing-id']);
+    expect(after[target]).toBeTruthy();
+    expect(Date.parse(after[target])).toBeGreaterThan(Date.parse(activity[USER]));
   });
 });

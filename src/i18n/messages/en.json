@@ -168,6 +168,8 @@
     "id": "ID",
     "lastActive": "Active {date}",
     "neverActive": "Never active",
+    "online": "Online",
+    "minutesAgo": "{count} min ago",
     "recentChanges": "Recent role changes",
     "noChanges": "No role changes yet.",
     "roleChangeLine": "{by} changed {target}'s role from {from} to {to}",

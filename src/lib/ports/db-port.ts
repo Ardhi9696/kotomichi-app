@@ -108,8 +108,10 @@ export interface VocabRepository {
   logRoleChange(input: { userId: string; byUserId: string; fromRole: Role; toRole: Role }): Promise<void>;
   /** Most recent role-change audit entries, newest first. */
   listRoleChanges(limit?: number): Promise<RoleChange[]>;
-  /** userId -> ISO timestamp of the user's last review activity (absent users have no entry). */
+  /** userId -> ISO timestamp of the user's last activity (heartbeat/review; absent users have no entry). */
   getLastActivityForUsers(userIds: string[]): Promise<Record<string, string>>;
+  /** Record that the user was active just now (online presence heartbeat). */
+  touchLastActivity(userId: string): Promise<void>;
 
   // ---------- vocabulary content ----------
   searchVocabulary(q: string, opts?: { limit?: number }): Promise<WordCard[]>;
