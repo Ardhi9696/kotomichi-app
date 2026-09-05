@@ -6,9 +6,10 @@ import { useState } from 'react';
 
 import { deleteUserAction, setUserRoleAction } from '@/app/actions/admin';
 import { ConfirmModal } from '@/components/confirm-modal';
+import { EditUserDialog } from '@/components/admin/edit-user-dialog';
 import type { Role } from '@/lib/domain';
 
-const ROLES: Role[] = ['user', 'admin', 'super_admin'];
+const ROLES: Role[] = ['user', 'admin'];
 
 type PendingAction = { kind: 'role'; role: Role } | { kind: 'delete' } | null;
 
@@ -54,6 +55,7 @@ export function ManageUserRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <EditUserDialog userId={userId} displayName={displayName} />
           <select
             value={roleState}
             onChange={(e) => setRoleState(e.target.value as Role)}

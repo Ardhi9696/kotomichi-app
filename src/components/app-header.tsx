@@ -14,21 +14,29 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
   const t = useTranslations();
   const pathname = usePathname();
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [menuOpenPath, setMenuOpenPath] = useState<string | null>(null);
 
-  const navLink = (href: string, label: string) => {
+  const menuOpen = menuOpenPath !== null && menuOpenPath === pathname;
+  const toggleMenu = () => setMenuOpenPath((v) => (v === pathname ? null : pathname));
+
+  const navLinks = signedIn
+    ? isAdmin
+      ? [
+          { href: '/dashboard', label: t('nav.home') },
+          { href: '/admin', label: t('nav.admin') },
+        ]
+      : [
+          { href: '/dashboard', label: t('nav.home') },
+          { href: '/learn', label: t('nav.learn') },
+          { href: '/review', label: t('nav.review') },
+        ]
+    : [];
+
+  const navLinkClass = (href: string) => {
     const active = pathname === href || pathname.startsWith(href + '/');
-    return (
-      <Link
-        href={href}
-        className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
-          active
-            ? 'bg-shu-500/10 font-semibold text-shu-500 dark:text-shu-300'
-            : 'text-ink-600 hover:text-ink-800 dark:text-ink-300 dark:hover:text-ink-100'
-        }`}
-      >
-        {label}
-      </Link>
-    );
+    return active
+      ? 'bg-shu-500/10 font-semibold text-shu-500 dark:text-shu-300'
+      : 'text-ink-600 hover:text-ink-800 dark:text-ink-300 dark:hover:text-ink-100';
   };
 
   const onLogoutConfirm = () => {
@@ -44,40 +52,85 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
           <span className="hidden text-[10px] uppercase tracking-[0.2em] text-shu-500 sm:inline">言道</span>
         </Link>
 
-        <nav className="flex flex-1 items-center gap-1">
-          {signedIn && (
-            <>
-              {isAdmin ? (
-                <>
-                  {navLink('/dashboard', t('nav.home'))}
-                  {navLink('/admin', t('nav.admin'))}
-                </>
-              ) : (
-                <>
-                  {navLink('/dashboard', t('nav.home'))}
-                  {navLink('/learn', t('nav.learn'))}
-                  {navLink('/review', t('nav.review'))}
-                </>
-              )}
-            </>
-          )}
+        <nav className="hidden flex-1 items-center gap-1 md:flex">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${navLinkClass(link.href)}`}
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1 md:ml-0">
           <LocaleSwitcher />
           <ThemeToggle />
 
-          {signedIn ? (
-            <button type="button" className="btn-ghost" onClick={() => setLogoutOpen(true)}>
-              {t('nav.logout')}
-            </button>
-          ) : (
-            <Link href="/login" className="btn-ghost">
-              {t('nav.login')}
-            </Link>
-          )}
+          <div className="hidden md:block">
+            {signedIn ? (
+              <button type="button" className="btn-ghost" onClick={() => setLogoutOpen(true)}>
+                {t('nav.logout')}
+              </button>
+            ) : (
+              <Link href="/login" className="btn-ghost">
+                {t('nav.login')}
+              </Link>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="btn-ghost p-2 md:hidden"
+            onClick={toggleMenu}
+            aria-expanded={menuOpen}
+            aria-label={t('nav.menu')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              {menuOpen ? (
+                <>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </>
+              ) : (
+                <>
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </>
+              )}
+            </svg>
+          </button>
         </div>
       </div>
+
+      {menuOpen && (
+        <div className="border-t border-ink-200/70 md:hidden dark:border-ink-800/70">
+          <nav className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-3">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`rounded-lg px-3 py-2.5 text-sm transition-colors ${navLinkClass(link.href)}`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="mt-1 border-t border-ink-200/70 pt-2 dark:border-ink-800/70">
+              {signedIn ? (
+                <button type="button" className="btn-ghost w-full justify-start" onClick={() => setLogoutOpen(true)}>
+                  {t('nav.logout')}
+                </button>
+              ) : (
+                <Link href="/login" className="btn-ghost w-full justify-start">
+                  {t('nav.login')}
+                </Link>
+              )}
+            </div>
+          </nav>
+        </div>
+      )}
 
       <ConfirmModal
         open={logoutOpen}

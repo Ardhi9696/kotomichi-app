@@ -18,6 +18,7 @@ export const DEFAULTS: AppConfig = {
   },
   deck: { masteryThreshold: 0.9 },
   fsrs: { weights: [...DEFAULT_W] },
+  signup: { enabled: true },
 };
 
 export const DEFAULT_THRESHOLDS: Record<Direction, { fastThresholdMs: number; goodThresholdMs: number }> = {
@@ -51,6 +52,13 @@ export function assembleAppConfig(
     if (Array.isArray(v)) return v.map(Number);
     return [...DEFAULTS.fsrs.weights];
   };
+  const bool = (k: string, fallback: boolean): boolean => {
+    const v = map.get(k);
+    if (v && typeof v === 'object' && 'value' in (v as object)) {
+      return Boolean((v as { value: unknown }).value);
+    }
+    return typeof v === 'boolean' ? v : fallback;
+  };
 
   return {
     exp: {
@@ -72,6 +80,9 @@ export function assembleAppConfig(
     fsrs: {
       weights: weights('fsrs.weights'),
     },
+    signup: {
+      enabled: bool('signup.enabled', DEFAULTS.signup.enabled),
+    },
   };
 }
 
@@ -89,5 +100,6 @@ export function flattenAppConfig(config: AppConfig): Array<{ key: string; valueJ
     { key: 'srs.max_interval_days', valueJson: { value: config.srs.maxIntervalDays } },
     { key: 'deck.mastery_threshold', valueJson: { value: config.deck.masteryThreshold } },
     { key: 'fsrs.weights', valueJson: { value: config.fsrs.weights } },
+    { key: 'signup.enabled', valueJson: { value: config.signup.enabled } },
   ];
 }

@@ -8,6 +8,7 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 import type {
   AuthProvider,
@@ -75,6 +76,22 @@ export class SupabaseAuthProvider implements AuthProvider {
       email: input.email,
       password: input.password,
       options: { data: { display_name: input.displayName } },
+    });
+    if (error) return { ok: false, error: mapError(error) };
+    const user = toUser(data.user);
+    if (!user) return { ok: false, error: 'profileLoadFailed' };
+    return { ok: true, data: user };
+  }
+
+  async adminCreateUser(input: SignUpInput): Promise<AuthResult<AuthUser>> {
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceKey || !process.env.SUPABASE_URL) return { ok: false, error: 'adminCreateFailed' };
+    const admin = createAdminClient(process.env.SUPABASE_URL, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data, error } = await admin.auth.admin.createUser({
+      email: input.email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: { display_name: input.displayName },
     });
     if (error) return { ok: false, error: mapError(error) };
     const user = toUser(data.user);

@@ -10,7 +10,8 @@
     "admin": "Kelola",
     "login": "Masuk",
     "register": "Buat akun",
-    "logout": "Keluar"
+    "logout": "Keluar",
+    "menu": "Menu"
   },
   "auth": {
     "signInTitle": "Selamat datang kembali",
@@ -48,6 +49,8 @@
     "passwordTooShort": "Kata sandi terlalu pendek (minimal 6 karakter)",
     "rateLimited": "Terlalu banyak percobaan, mohon tunggu",
     "signupDisabled": "Pendaftaran ditutup. Hubungi admin untuk membuat akun.",
+    "adminCreateFailed": "Gagal membuat akun. Periksa konfigurasi penyedia autentikasi.",
+    "invalidRole": "Role tidak valid.",
     "confirmEmailFirst": "Konfirmasi email kamu terlebih dahulu",
     "profileLoadFailed": "Gagal memuat profil kamu",
     "sessionFailed": "Sesi gagal dibuat",
@@ -167,7 +170,14 @@
     "roleChangeTitle": "Ubah role?",
     "roleChangeDescription": "Ubah role {name} dari {from} menjadi {to}?",
     "deleteUserTitle": "Hapus pengguna?",
-    "deleteUserDescription": "Ini menghapus {name} beserta seluruh progresnya secara permanen. Tindakan ini tidak dapat dibatalkan."
+    "deleteUserDescription": "Ini menghapus {name} beserta seluruh progresnya secara permanen. Tindakan ini tidak dapat dibatalkan.",
+    "addUserTitle": "Tambah pengguna baru",
+    "addUserButton": "Tambah pengguna",
+    "userCreated": "Pengguna berhasil dibuat.",
+    "editUserTitle": "Edit pengguna",
+    "passwordFixedNote": "Password dibuat sekali saat akun dibuat dan tidak dapat diubah di sini.",
+    "settingsSubtitle": "Konfigurasi global — khusus super admin.",
+    "signupEnabled": "Izinkan pendaftaran mandiri"
   },
   "common": {
     "back": "Kembali",

@@ -9,7 +9,7 @@ import { isSignupEnabled } from '@/lib/server/runtime';
 export const metadata: Metadata = { title: 'Create account — Kotomichi' };
 
 export default async function RegisterPage() {
-  if (!isSignupEnabled()) redirect('/login');
+  if (!(await isSignupEnabled())) redirect('/login');
   const t = await getTranslations('auth');
   return (
     <AuthShell>

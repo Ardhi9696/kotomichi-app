@@ -4,7 +4,6 @@ import Link from 'next/link';
 
 import { requireRole } from '@/lib/server/dal';
 import { getRepository } from '@/lib/server/runtime';
-import { AppHeader } from '@/components/app-header';
 import {
   createDeckAction,
   updateDeckAction,
@@ -38,24 +37,26 @@ async function DecksTabContent() {
       <div className="flex flex-col gap-3">
         <h3 className="font-serif text-lg font-bold text-ink-800 dark:text-ink-100">Existing decks</h3>
         {decks.map((d: Deck) => (
-          <form key={d.id} action={updateDeckAction} className="card flex flex-col gap-2 p-4 text-sm">
-            <input type="hidden" name="id" value={d.id} />
-            <div className="flex items-center gap-2">
-              <input name="title" defaultValue={d.title} className="field" />
-              <button type="submit" className="btn-secondary">Save</button>
-              <form action={togglePublishAction}>
-                <input type="hidden" name="id" value={d.id} />
-                <input type="hidden" name="published" value={d.isPublished ? '' : 'on'} />
-                <button type="submit" className="btn-ghost">{d.isPublished ? 'Unpublish' : 'Publish'}</button>
-              </form>
-            </div>
-            <div className="flex gap-2">
-              <select name="jlptLevel" className="field" defaultValue={d.jlptLevel ?? ''}>
-                {JLPT.map((l) => <option key={l} value={l}>{l || 'JLPT'}</option>)}
-              </select>
-              <input name="subtitle" defaultValue={d.subtitle ?? ''} placeholder="Subtitle" className="field" />
-            </div>
-          </form>
+          <div key={d.id} className="flex flex-col gap-2">
+            <form action={updateDeckAction} className="card flex flex-col gap-2 p-4 text-sm">
+              <input type="hidden" name="id" value={d.id} />
+              <div className="flex items-center gap-2">
+                <input name="title" defaultValue={d.title} className="field" />
+                <button type="submit" className="btn-secondary">Save</button>
+              </div>
+              <div className="flex gap-2">
+                <select name="jlptLevel" className="field" defaultValue={d.jlptLevel ?? ''}>
+                  {JLPT.map((l) => <option key={l} value={l}>{l || 'JLPT'}</option>)}
+                </select>
+                <input name="subtitle" defaultValue={d.subtitle ?? ''} placeholder="Subtitle" className="field" />
+              </div>
+            </form>
+            <form action={togglePublishAction}>
+              <input type="hidden" name="id" value={d.id} />
+              <input type="hidden" name="published" value={d.isPublished ? '' : 'on'} />
+              <button type="submit" className="btn-ghost">{d.isPublished ? 'Unpublish' : 'Publish'}</button>
+            </form>
+          </div>
         ))}
       </div>
     </div>
@@ -65,36 +66,32 @@ async function DecksTabContent() {
 export default async function AdminPage() {
   const current = await requireRole('admin', 'super_admin');
   const t = await getTranslations('admin');
-  const isAdmin = current.profile.role === 'admin' || current.profile.role === 'super_admin';
   const isSuper = current.profile.role === 'super_admin';
 
   const [words, decks] = await Promise.all([getWords(), DecksTabContent()]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <AppHeader signedIn isAdmin={isAdmin} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-        <section className="mb-6">
-          <h1 className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('title')}</h1>
-          <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
-        </section>
+    <div className="flex flex-col gap-6">
+      <section className="mb-2">
+        <h1 className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('title')}</h1>
+        <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
+      </section>
 
-        {isSuper && (
-          <div className="mb-6 flex gap-3">
-            <Link href="/admin/users" className="btn-secondary">Manage users</Link>
-            <Link href="/admin/settings" className="btn-secondary">Settings</Link>
-          </div>
-        )}
-
-        <div className="mb-6 flex flex-col gap-10">
-          <VocabDashboard words={words} />
-          {decks}
+      {isSuper && (
+        <div className="flex gap-3">
+          <Link href="/admin/users" className="btn-secondary">{t('manageUsers')}</Link>
+          <Link href="/admin/settings" className="btn-secondary">{t('tabConfig')}</Link>
         </div>
+      )}
 
-        <p className="mt-8">
-          <Link href="/dashboard" className="text-sm text-shu-500 hover:underline">← Dashboard</Link>
-        </p>
-      </main>
+      <div className="flex flex-col gap-10">
+        <VocabDashboard words={words} />
+        {decks}
+      </div>
+
+      <p>
+        <Link href="/dashboard" className="text-sm text-shu-500 hover:underline">← {t('overviewTitle')}</Link>
+      </p>
     </div>
   );
 }

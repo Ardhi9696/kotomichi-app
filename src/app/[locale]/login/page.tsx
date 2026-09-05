@@ -14,7 +14,7 @@ export default async function LoginPage() {
       <div className="card w-full max-w-sm p-8">
         <h1 className="font-serif text-2xl font-bold text-ink-900 dark:text-washi-50">{t('signInTitle')}</h1>
         <p className="mb-6 mt-1 text-sm text-ink-500 dark:text-ink-400">{t('signInSubtitle')}</p>
-        <LoginForm showSignupLink={isSignupEnabled()} />
+        <LoginForm showSignupLink={await isSignupEnabled()} />
       </div>
     </AuthShell>
   );

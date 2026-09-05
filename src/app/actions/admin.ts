@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache';
 
 import { requireRole } from '@/lib/server/dal';
-import { getRepository } from '@/lib/server/runtime';
-import type { JlptLevel, Role } from '@/lib/domain';
+import { getAuthProvider, getRepository } from '@/lib/server/runtime';
+import type { JlptLevel, Role, UserProfile } from '@/lib/domain';
 import type { TagWithVocabInput } from '@/lib/ports/db-port';
 
 function jlpt(value: string | null): JlptLevel | null {
@@ -146,16 +146,13 @@ export async function setUserRoleAction(formData: FormData): Promise<void> {
   const repo = await getRepository();
   const userId = String(formData.get('userId') ?? '');
   const role = String(formData.get('role') ?? '') as Role;
-  if (!userId || !['user', 'admin', 'super_admin'].includes(role)) return;
-  if (userId === current.user.id && role !== 'super_admin') return;
+  // The app runs with exactly one super admin (§ single-super-admin): role
+  // edits may only move users between 'user' and 'admin'.
+  if (!userId || !['user', 'admin'].includes(role)) return;
+  if (userId === current.user.id) return;
 
   const target = await repo.getUserProfile(userId);
-  if (!target || target.role === role) return;
-
-  if (target.role === 'super_admin' && role !== 'super_admin') {
-    const supers = (await repo.listUserProfiles()).filter((u) => u.role === 'super_admin').length;
-    if (supers <= 1) return; // never drop the last super admin
-  }
+  if (!target || target.role === role || target.role === 'super_admin') return;
 
   await repo.setUserRole(userId, role);
   await repo.logRoleChange({ userId, byUserId: current.user.id, fromRole: target.role, toRole: role });
@@ -169,15 +166,59 @@ export async function deleteUserAction(formData: FormData): Promise<void> {
   if (!userId || userId === current.user.id) return;
 
   const target = await repo.getUserProfile(userId);
-  if (!target) return;
-
-  if (target.role === 'super_admin') {
-    const supers = (await repo.listUserProfiles()).filter((u) => u.role === 'super_admin').length;
-    if (supers <= 1) return; // never delete the last super admin
-  }
+  if (!target || target.role === 'super_admin') return;
 
   await repo.deleteUser(userId);
   revalidatePath('/admin/users');
+}
+
+export type CreateUserState = { error?: string; ok?: boolean };
+
+export async function createUserAction(_prev: CreateUserState, formData: FormData): Promise<CreateUserState> {
+  await requireRole('super_admin');
+  const displayName = String(formData.get('displayName') ?? '').trim();
+  const email = String(formData.get('email') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
+  const role = String(formData.get('role') ?? '') as Role;
+  if (!displayName || !email || !password) return { error: 'missingFields' };
+  if (password.length < 6) return { error: 'passwordTooShort' };
+  // exactly one super admin exists — new accounts may only be admin or user
+  if (!['user', 'admin'].includes(role)) return { error: 'invalidRole' };
+
+  const auth = await getAuthProvider();
+  const result = await auth.adminCreateUser({ email, password, displayName });
+  if (!result.ok || !result.data) return { error: result.error ?? 'adminCreateFailed' };
+
+  const profile: UserProfile = {
+    id: result.data.id,
+    displayName,
+    role,
+    preferredLocale: 'en',
+    level: 1,
+    exp: 0,
+    lastReviewDate: null,
+    currentStreak: 0,
+    longestStreak: 0,
+    createdAt: new Date().toISOString(),
+  };
+  const repo = await getRepository();
+  await repo.createUserProfile(profile);
+
+  revalidatePath('/admin/users');
+  return { ok: true };
+}
+
+export type RenameUserState = { error?: string; ok?: boolean };
+
+export async function renameUserAction(_prev: RenameUserState, formData: FormData): Promise<RenameUserState> {
+  await requireRole('super_admin');
+  const userId = String(formData.get('userId') ?? '');
+  const displayName = String(formData.get('displayName') ?? '').trim();
+  if (!userId || !displayName) return { error: 'missingFields' };
+  const repo = await getRepository();
+  await repo.updateUserProfile(userId, { displayName });
+  revalidatePath('/admin/users');
+  return { ok: true };
 }
 
 export async function setConfigAction(formData: FormData): Promise<void> {
@@ -188,6 +229,7 @@ export async function setConfigAction(formData: FormData): Promise<void> {
   const desiredRetention = Number(formData.get('desiredRetention'));
   if (Number.isFinite(dailyNewCap) && dailyNewCap > 0) config.srs.dailyNewCap = Math.floor(dailyNewCap);
   if (Number.isFinite(desiredRetention) && desiredRetention > 0 && desiredRetention < 1) config.srs.desiredRetention = desiredRetention;
+  config.signup.enabled = formData.get('signupEnabled') === 'on';
   await repo.setAppConfig(config);
   revalidatePath('/admin/settings');
 }

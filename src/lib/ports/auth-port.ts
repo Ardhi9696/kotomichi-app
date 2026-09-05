@@ -27,6 +27,8 @@ export interface AuthResult<T = void> {
 export interface AuthProvider {
   getSession(): Promise<AuthSession>;
   signUp(input: SignUpInput): Promise<AuthResult<AuthUser>>;
+  /** Super-admin action: provision an account server-side (bypasses signup gate). */
+  adminCreateUser(input: SignUpInput): Promise<AuthResult<AuthUser>>;
   signIn(email: string, password: string): Promise<AuthResult<AuthUser>>;
   signOut(): Promise<void>;
   /** Request a password-reset email. Provider-specific email flow follows. */

@@ -79,7 +79,8 @@ export async function isDemoMode(): Promise<boolean> {
   return !hasPostgres();
 }
 
-/** Public self-signup gate (set ALLOW_SIGNUP=false to close registration). */
-export function isSignupEnabled(): boolean {
-  return process.env.ALLOW_SIGNUP !== 'false';
+/** Public self-signup gate (remote config boolean, toggled by a super admin). */
+export async function isSignupEnabled(): Promise<boolean> {
+  const repo = await getRepository();
+  return (await repo.getAppConfig()).signup.enabled;
 }

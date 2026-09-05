@@ -152,6 +152,9 @@ export interface AppConfig {
   fsrs: {
     weights: number[];
   };
+  signup: {
+    enabled: boolean;
+  };
 }
 
 /** A single study card for Learn or Review sessions (server-computed). */

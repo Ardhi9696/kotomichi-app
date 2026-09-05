@@ -52,7 +52,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  if (!isSignupEnabled()) return { error: 'signupDisabled' };
+  if (!(await isSignupEnabled())) return { error: 'signupDisabled' };
   const displayName = String(formData.get('displayName') ?? '').trim();
   const email = String(formData.get('email') ?? '').trim();
   const password = String(formData.get('password') ?? '');

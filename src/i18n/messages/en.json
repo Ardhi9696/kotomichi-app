@@ -10,7 +10,10 @@
     "admin": "Admin",
     "login": "Log in",
     "register": "Create account",
-    "logout": "Log out"
+    "logout": "Log out",
+    "menu": "Menu",
+    "theme": "Theme",
+    "language": "Language"
   },
   "auth": {
     "signInTitle": "Welcome back",
@@ -48,6 +51,8 @@
     "passwordTooShort": "Password is too short (minimum 6 characters)",
     "rateLimited": "Too many attempts, please wait",
     "signupDisabled": "Registration is closed. Contact an administrator for an account.",
+    "adminCreateFailed": "Couldn't create the account. Check your auth provider configuration.",
+    "invalidRole": "Invalid role.",
     "confirmEmailFirst": "Please confirm your email first",
     "profileLoadFailed": "Could not load your profile",
     "sessionFailed": "Session could not be established",
@@ -167,7 +172,14 @@
     "roleChangeTitle": "Change role?",
     "roleChangeDescription": "Change {name}'s role from {from} to {to}?",
     "deleteUserTitle": "Delete user?",
-    "deleteUserDescription": "This permanently removes {name} and all of their progress. This cannot be undone."
+    "deleteUserDescription": "This permanently removes {name} and all of their progress. This cannot be undone.",
+    "addUserTitle": "Add a new user",
+    "addUserButton": "Add user",
+    "userCreated": "User created.",
+    "editUserTitle": "Edit user",
+    "passwordFixedNote": "The password is set once when the account is created and cannot be changed here.",
+    "settingsSubtitle": "Global configuration — super admin only.",
+    "signupEnabled": "Allow self-registration"
   },
   "common": {
     "back": "Back",

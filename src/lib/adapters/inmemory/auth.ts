@@ -60,6 +60,10 @@ export class InMemoryAuthProvider implements AuthProvider {
     return { ok: true, data: user };
   }
 
+  async adminCreateUser(input: SignUpInput): Promise<AuthResult<AuthUser>> {
+    return this.signUp(input);
+  }
+
   async signIn(email: string, password: string): Promise<AuthResult<AuthUser>> {
     const a = this.accounts.get(email.toLowerCase().trim());
     if (!a || a.password !== password) return { ok: false, error: 'invalidCredentials' };
