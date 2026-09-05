@@ -50,16 +50,16 @@ const toUser = (u: { id: string; email?: string | null } | null | undefined): Au
   u ? { id: u.id, email: u.email ?? '' } : null;
 
 const mapError = (e: { message?: string; code?: string } | null): string => {
-  if (!e?.message) return 'Unknown auth error';
+  if (!e?.message) return 'unknownAuthError';
   const msg = e.message.toLowerCase();
-  if (msg.includes('invalid login credentials')) return 'Invalid email or password';
+  if (msg.includes('invalid login credentials')) return 'invalidCredentials';
   if (msg.includes('already registered') || msg.includes('already been registered')) {
-    return 'This email is already registered';
+    return 'emailInUse';
   }
-  if (msg.includes('password should be at least')) return 'Password is too short';
-  if (msg.includes('rate limit')) return 'Too many attempts, please wait';
-  if (msg.includes('email not confirmed') || msg.includes('email is not')) return 'Please confirm your email first';
-  return e.message;
+  if (msg.includes('password should be at least')) return 'passwordTooShort';
+  if (msg.includes('rate limit')) return 'rateLimited';
+  if (msg.includes('email not confirmed') || msg.includes('email is not')) return 'confirmEmailFirst';
+  return msg;
 };
 
 export class SupabaseAuthProvider implements AuthProvider {
@@ -77,7 +77,9 @@ export class SupabaseAuthProvider implements AuthProvider {
       options: { data: { display_name: input.displayName } },
     });
     if (error) return { ok: false, error: mapError(error) };
-    return { ok: true, data: toUser(data.user) ?? { id: '', email: input.email } };
+    const user = toUser(data.user);
+    if (!user) return { ok: false, error: 'profileLoadFailed' };
+    return { ok: true, data: user };
   }
 
   async signIn(email: string, password: string): Promise<AuthResult<AuthUser>> {
@@ -85,7 +87,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     const { data, error } = await client.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, error: mapError(error) };
     const user = toUser(data.user);
-    if (!user) return { ok: false, error: 'Could not load your profile' };
+    if (!user) return { ok: false, error: 'profileLoadFailed' };
     return { ok: true, data: user };
   }
 
@@ -105,7 +107,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     const client = await getClient();
     const { data, error } = await client.auth.verifyOtp({ type: 'recovery', token_hash: code });
     if (error) return { ok: false, error: mapError(error) };
-    if (!data.session) return { ok: false, error: 'Session could not be established' };
+    if (!data.session) return { ok: false, error: 'sessionFailed' };
     const { error: updateError } = await client.auth.updateUser({ password: newPassword });
     if (updateError) return { ok: false, error: mapError(updateError) };
     return { ok: true };

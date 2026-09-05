@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 
 import { signUpAction, type ActionState } from '@/app/actions/auth';
+import { PasswordField } from '@/components/password-field';
 
 export function RegisterForm() {
   const t = useTranslations('auth');
@@ -22,14 +23,14 @@ export function RegisterForm() {
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="password" className="text-sm text-ink-600 dark:text-ink-300">{t('password')}</label>
-        <input id="password" name="password" type="password" autoComplete="new-password" minLength={6} required className="field" />
+        <PasswordField name="password" autoComplete="new-password" minLength={6} required />
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="confirmPassword" className="text-sm text-ink-600 dark:text-ink-300">{t('confirmPassword')}</label>
-        <input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={6} required className="field" />
+        <PasswordField name="confirmPassword" autoComplete="new-password" minLength={6} required />
       </div>
 
-      {state.error && <p className="text-sm text-shu-500">{t(state.error) || state.error}</p>}
+      {state.error && <p className="text-sm text-shu-500">{t.has(state.error) ? t(state.error) : state.error}</p>}
 
       <button type="submit" disabled={pending} className="btn-primary w-full">
         {pending ? '…' : t('submit')}

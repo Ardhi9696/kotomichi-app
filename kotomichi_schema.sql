@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS srs_progress (
     PRIMARY KEY (user_id, vocabulary_id, direction)
 );
 
-CREATE INDEX IF NOT EXISTS idx_srs_due ON srs_progress (user_id, due_at) WHERE due_at <= now();
+CREATE INDEX IF NOT EXISTS idx_srs_due ON srs_progress (user_id, due_at);
 
 CREATE TABLE IF NOT EXISTS review_log (
     id                  BIGSERIAL PRIMARY KEY,

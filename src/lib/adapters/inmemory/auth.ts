@@ -47,8 +47,8 @@ export class InMemoryAuthProvider implements AuthProvider {
 
   async signUp(input: SignUpInput): Promise<AuthResult<AuthUser>> {
     const email = input.email.toLowerCase().trim();
-    if (this.accounts.has(email)) return { ok: false, error: 'Email already registered' };
-    if (input.password.length < 6) return { ok: false, error: 'Password too short (min 6)' };
+    if (this.accounts.has(email)) return { ok: false, error: 'emailInUse' };
+    if (input.password.length < 6) return { ok: false, error: 'passwordTooShort' };
     const account: MemAccount = {
       id: crypto.randomUUID(),
       email,
@@ -62,7 +62,7 @@ export class InMemoryAuthProvider implements AuthProvider {
 
   async signIn(email: string, password: string): Promise<AuthResult<AuthUser>> {
     const a = this.accounts.get(email.toLowerCase().trim());
-    if (!a || a.password !== password) return { ok: false, error: 'Invalid email or password' };
+    if (!a || a.password !== password) return { ok: false, error: 'invalidCredentials' };
     this.current = this.toUser(a);
     return { ok: true, data: this.current };
   }

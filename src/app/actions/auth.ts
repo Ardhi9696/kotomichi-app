@@ -9,6 +9,37 @@ export interface ActionState {
   error?: string;
 }
 
+export interface ForgotPasswordState extends ActionState {
+  sent?: boolean;
+}
+
+export async function forgotPasswordAction(
+  _prev: ForgotPasswordState,
+  formData: FormData,
+): Promise<ForgotPasswordState> {
+  const email = String(formData.get('email') ?? '').trim();
+  if (!email) return { error: 'missingFields' };
+
+  const auth = await getAuthProvider();
+  const result = await auth.sendPasswordReset(email);
+  if (!result.ok) return { error: result.error ?? 'unknownAuthError' };
+  return { sent: true };
+}
+
+export async function resetPasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const code = String(formData.get('code') ?? '').trim();
+  const password = String(formData.get('password') ?? '');
+  const confirm = String(formData.get('confirmPassword') ?? '');
+  if (!code) return { error: 'invalidResetCode' };
+  if (password.length < 6) return { error: 'passwordTooShort' };
+  if (password !== confirm) return { error: 'passwordMismatch' };
+
+  const auth = await getAuthProvider();
+  const result = await auth.resetPassword(code, password);
+  if (!result.ok) return { error: result.error ?? 'unknownAuthError' };
+  redirect('/login');
+}
+
 export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get('email') ?? '').trim();
   const password = String(formData.get('password') ?? '');
