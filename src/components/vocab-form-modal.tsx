@@ -26,6 +26,7 @@ export function VocabFormModal({
   initial?: WordCard | null;
 }) {
   const router = useRouter();
+  const [pending, setPending] = useState(false);
   const [examples, setExamples] = useState<{ jp: string; id: string; en: string }[]>(() =>
     initial?.examples?.length
       ? initial.examples.map((e) => ({
@@ -43,6 +44,11 @@ export function VocabFormModal({
   const [jftBasic, setJftBasic] = useState(Boolean(initial?.vocabulary.jftBasic));
   const [partOfSpeech, setPartOfSpeech] = useState(initial?.vocabulary.partOfSpeech ?? '');
   const [verbCollocation, setVerbCollocation] = useState(Boolean(initial?.vocabulary.verbCollocation));
+  const [kanji, setKanji] = useState(initial?.vocabulary.kanji ?? '');
+  const [hiragana, setHiragana] = useState(initial?.vocabulary.hiragana ?? '');
+  const [romaji, setRomaji] = useState(initial?.vocabulary.romaji ?? '');
+  const [meaningId, setMeaningId] = useState(initial?.translations['id'] ?? '');
+  const [meaningEn, setMeaningEn] = useState(initial?.translations['en'] ?? '');
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -53,14 +59,53 @@ export function VocabFormModal({
     v?.jidoushi && v?.tadoushi ? 'both' : v?.jidoushi ? 'jidoushi' : v?.tadoushi ? 'tadoushi' : '';
   const defaultAdjectiveType = v?.iAdjective ? 'i' : v?.naAdjective ? 'na' : '';
 
+  const hasChanges = editing ? (
+    kanji !== (v?.kanji ?? '') ||
+    hiragana !== (v?.hiragana ?? '') ||
+    romaji !== (v?.romaji ?? '') ||
+    meaningId !== (initial?.translations['id'] ?? '') ||
+    meaningEn !== (initial?.translations['en'] ?? '') ||
+    jftBasic !== Boolean(v?.jftBasic) ||
+    partOfSpeech !== (v?.partOfSpeech ?? '') ||
+    verbCollocation !== Boolean(v?.verbCollocation) ||
+    examples.length !== (initial?.examples?.length ?? 1) ||
+    examples.some((e, i) => {
+      const orig = initial?.examples?.[i];
+      return e.jp !== (orig?.japanese ?? '') ||
+        e.id !== exampleTr(orig?.translations ?? [], 'id') ||
+        e.en !== exampleTr(orig?.translations ?? [], 'en');
+    }) ||
+    collocations.length !== (initial?.collocations?.length ?? 1) ||
+    collocations.some((c, i) => {
+      const orig = initial?.collocations?.[i];
+      return c.text !== (orig?.collocation ?? '') || c.meaning !== (orig?.meaning ?? '');
+    })
+  ) : (
+    hiragana.trim() !== '' ||
+    kanji.trim() !== '' ||
+    romaji.trim() !== '' ||
+    meaningId.trim() !== '' ||
+    meaningEn.trim() !== '' ||
+    jftBasic ||
+    partOfSpeech !== '' ||
+    verbCollocation ||
+    examples.some(e => e.jp.trim() !== '' || e.id.trim() !== '' || e.en.trim() !== '') ||
+    collocations.some(c => c.text.trim() !== '' || c.meaning.trim() !== '')
+  );
+
   const submit = async (formData: FormData) => {
-    if (editing) {
-      await upsertVocabularyAction(formData);
-    } else {
-      await createVocabularyAction(formData);
+    setPending(true);
+    try {
+      if (editing) {
+        await upsertVocabularyAction(formData);
+      } else {
+        await createVocabularyAction(formData);
+      }
+      onClose();
+      router.refresh();
+    } finally {
+      setPending(false);
     }
-    onClose();
-    router.refresh();
   };
 
   return createPortal(
@@ -87,15 +132,28 @@ export function VocabFormModal({
             </p>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <input name="kanji" defaultValue={v?.kanji ?? ''} placeholder="Kanji 漢字 (opsional)" className="field" />
+              <input 
+                name="kanji" 
+                value={kanji}
+                onChange={(e) => setKanji(e.target.value)}
+                placeholder="Kanji 漢字 (opsional)" 
+                className="field" 
+              />
               <input
                 name="hiragana"
-                defaultValue={v?.hiragana ?? ''}
+                value={hiragana}
+                onChange={(e) => setHiragana(e.target.value)}
                 placeholder="Hiragana ひらがな * (wajib)"
                 required
                 className="field"
               />
-              <input name="romaji" defaultValue={v?.romaji ?? ''} placeholder="Romaji (opsional)" className="field" />
+              <input 
+                name="romaji" 
+                value={romaji}
+                onChange={(e) => setRomaji(e.target.value)}
+                placeholder="Romaji (opsional)" 
+                className="field" 
+              />
             </div>
 
             <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
@@ -206,13 +264,15 @@ export function VocabFormModal({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input
                 name="meaning_id"
-                defaultValue={initial?.translations['id'] ?? ''}
+                value={meaningId}
+                onChange={(e) => setMeaningId(e.target.value)}
                 placeholder="Meaning (Indonesian) — opsional"
                 className="field"
               />
               <input
                 name="meaning_en"
-                defaultValue={initial?.translations['en'] ?? ''}
+                value={meaningEn}
+                onChange={(e) => setMeaningEn(e.target.value)}
                 placeholder="Meaning (English) — opsional"
                 className="field"
               />
@@ -326,7 +386,13 @@ export function VocabFormModal({
 
           <div className="flex justify-end gap-2 border-t border-ink-200 px-6 py-4 dark:border-ink-800">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn-primary">{editing ? 'Save' : 'Add vocabulary'}</button>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={pending || (editing && !hasChanges)}
+            >
+              {pending ? 'Saving...' : editing ? 'Save' : 'Add vocabulary'}
+            </button>
           </div>
         </form>
       </div>

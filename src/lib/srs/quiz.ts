@@ -89,6 +89,8 @@ export interface QuizQuestion {
   directionId: number;
   /** Human-readable label for the direction. */
   directionLabel: QuizDirectionLabel;
+  /** Optional hint for the question (e.g., hiragana reading for kanji). */
+  hint?: string;
 }
 
 // ------------------------------------------------------------------
@@ -201,7 +203,7 @@ export function buildQuizSession(
       ]);
 
       // Show hiragana hint when front is kanji; no hint otherwise.
-      const hint = frontKind(dir) === 'kanji' ? word.vocabulary.hiragana : null;
+      const hint = frontKind(dir) === 'kanji' ? word.vocabulary.hiragana : undefined;
 
       questions.push({
         vocabularyId: word.vocabulary.id,
