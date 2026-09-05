@@ -9,6 +9,16 @@ export type Role = 'super_admin' | 'admin' | 'user';
 
 export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
 
+/** An audit record of a role change performed by a super admin. */
+export interface RoleChange {
+  id: number;
+  userId: string;
+  byUserId: string;
+  fromRole: Role;
+  toRole: Role;
+  createdAt: string;
+}
+
 export interface UserProfile {
   id: string;
   displayName: string;

@@ -15,6 +15,7 @@ import type {
   JlptLevel,
   ReviewLog,
   Role,
+  RoleChange,
   SrsProgress,
   UserProfile,
   Vocabulary,
@@ -29,6 +30,7 @@ import {
   exampleSentenceTranslations,
   exampleSentences,
   reviewLog,
+  roleChangeLog,
   srsProgress,
   userProfile,
   verbCollocations,
@@ -182,6 +184,17 @@ function toReviewLog(r: typeof reviewLog.$inferSelect): ReviewLog {
   };
 }
 
+function toRoleChange(r: typeof roleChangeLog.$inferSelect): RoleChange {
+  return {
+    id: r.id,
+    userId: r.userId,
+    byUserId: r.byUserId,
+    fromRole: r.fromRole,
+    toRole: r.toRole,
+    createdAt: iso(r.createdAt),
+  };
+}
+
 export class PostgresVocabRepo implements VocabRepository {
   // ================= profiles =================
   async getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -236,6 +249,36 @@ export class PostgresVocabRepo implements VocabRepository {
 
   async deleteUser(userId: string): Promise<void> {
     await getDb().delete(userProfile).where(eq(userProfile.id, userId));
+  }
+
+  async logRoleChange(input: { userId: string; byUserId: string; fromRole: Role; toRole: Role }): Promise<void> {
+    await getDb()
+      .insert(roleChangeLog)
+      .values({ userId: input.userId, byUserId: input.byUserId, fromRole: input.fromRole, toRole: input.toRole });
+  }
+
+  async listRoleChanges(limit = 20): Promise<RoleChange[]> {
+    const rows = await getDb()
+      .select()
+      .from(roleChangeLog)
+      .orderBy(desc(roleChangeLog.createdAt), desc(roleChangeLog.id))
+      .limit(limit);
+    return rows.map(toRoleChange);
+  }
+
+  async getLastActivityForUsers(userIds: string[]): Promise<Record<string, string>> {
+    if (userIds.length === 0) return {};
+    const rows = await getDb()
+      .select({
+        userId: reviewLog.userId,
+        last: sql<Date>`max(${reviewLog.reviewedAt})`,
+      })
+      .from(reviewLog)
+      .where(inArray(reviewLog.userId, userIds))
+      .groupBy(reviewLog.userId);
+    const map: Record<string, string> = {};
+    for (const r of rows) map[r.userId] = iso(r.last);
+    return map;
   }
 
   // ================= vocabulary content =================

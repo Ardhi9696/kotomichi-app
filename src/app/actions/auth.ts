@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 
-import { getAuthProvider, getRepository } from '@/lib/server/runtime';
+import { getAuthProvider, getRepository, isSignupEnabled } from '@/lib/server/runtime';
 import type { UserProfile } from '@/lib/domain';
 
 export interface ActionState {
@@ -52,6 +52,7 @@ export async function signInAction(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  if (!isSignupEnabled()) return { error: 'signupDisabled' };
   const displayName = String(formData.get('displayName') ?? '').trim();
   const email = String(formData.get('email') ?? '').trim();
   const password = String(formData.get('password') ?? '');

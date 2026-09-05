@@ -12,6 +12,7 @@ import type {
   JlptLevel,
   ReviewLog,
   Role,
+  RoleChange,
   SrsProgress,
   UserProfile,
   Vocabulary,
@@ -38,6 +39,8 @@ export class InMemoryVocabRepo implements VocabRepository {
   private deckMembership = new Map<number, number[]>();
   private progress = new Map<string, SrsProgress>();
   private logs = new Map<string, ReviewLog[]>();
+  private roleChanges: RoleChange[] = [];
+  private nextRoleChangeId = 1;
   private config: AppConfig = structuredClone(DEFAULTS);
   private thresholds: Record<Direction, DirectionThreshold> = structuredClone(
     DEFAULT_THRESHOLDS,
@@ -95,6 +98,31 @@ export class InMemoryVocabRepo implements VocabRepository {
     for (const k of this.progress.keys()) {
       if (k.startsWith(`${userId}:`)) this.progress.delete(k);
     }
+  }
+
+  async logRoleChange(input: { userId: string; byUserId: string; fromRole: Role; toRole: Role }): Promise<void> {
+    this.roleChanges.push({
+      id: this.nextRoleChangeId++,
+      userId: input.userId,
+      byUserId: input.byUserId,
+      fromRole: input.fromRole,
+      toRole: input.toRole,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  async listRoleChanges(limit = 20): Promise<RoleChange[]> {
+    return [...this.roleChanges].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+  }
+
+  async getLastActivityForUsers(userIds: string[]): Promise<Record<string, string>> {
+    const wanted = new Set(userIds);
+    const map: Record<string, string> = {};
+    for (const [uid, logs] of this.logs) {
+      if (!wanted.has(uid) || logs.length === 0) continue;
+      map[uid] = logs.reduce((max, l) => (l.reviewedAt > max ? l.reviewedAt : max), logs[0].reviewedAt);
+    }
+    return map;
   }
 
   // ================= vocabulary content =================

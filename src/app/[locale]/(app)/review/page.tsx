@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
-import { getStudyContext } from '@/lib/server/dal';
+import { requireLearner, getStudyContext } from '@/lib/server/dal';
 import { FlashcardSession } from '@/components/flashcard-session';
 
 export const metadata: Metadata = { title: 'Review — Kotomichi' };
 
 export default async function ReviewPage() {
+  await requireLearner();
   const t = await getTranslations('review');
   const { user, profile, service } = await getStudyContext();
   const now = new Date().toISOString();

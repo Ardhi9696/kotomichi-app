@@ -77,6 +77,17 @@ export async function requireRole(...roles: Role[]): Promise<CurrentUser> {
   return current;
 }
 
+/**
+ * Guards learner-only pages. Learners (`user`) pass through; staff
+ * (`admin`/`super_admin`) are sent to /dashboard since management roles do
+ * not study.
+ */
+export async function requireLearner(): Promise<CurrentUser> {
+  const current = await requireUser();
+  if (current.profile.role !== 'user') redirect('/dashboard');
+  return current;
+}
+
 export interface StudyContext {
   user: SessionUser;
   profile: UserProfile;

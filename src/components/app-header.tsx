@@ -3,15 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { FormEvent } from 'react';
+import { useState } from 'react';
 
 import { signOutAction } from '@/app/actions/auth';
+import { ConfirmModal } from '@/components/confirm-modal';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: boolean }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const [logoutOpen, setLogoutOpen] = useState(false);
 
   const navLink = (href: string, label: string) => {
     const active = pathname === href || pathname.startsWith(href + '/');
@@ -29,8 +31,8 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
     );
   };
 
-  const onLogout = (e: FormEvent) => {
-    e.preventDefault();
+  const onLogoutConfirm = () => {
+    setLogoutOpen(false);
     void signOutAction();
   };
 
@@ -45,10 +47,18 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
         <nav className="flex flex-1 items-center gap-1">
           {signedIn && (
             <>
-              {navLink('/dashboard', t('nav.home'))}
-              {navLink('/learn', t('nav.learn'))}
-              {navLink('/review', t('nav.review'))}
-              {isAdmin && navLink('/admin', t('nav.admin'))}
+              {isAdmin ? (
+                <>
+                  {navLink('/dashboard', t('nav.home'))}
+                  {navLink('/admin', t('nav.admin'))}
+                </>
+              ) : (
+                <>
+                  {navLink('/dashboard', t('nav.home'))}
+                  {navLink('/learn', t('nav.learn'))}
+                  {navLink('/review', t('nav.review'))}
+                </>
+              )}
             </>
           )}
         </nav>
@@ -58,11 +68,9 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
           <ThemeToggle />
 
           {signedIn ? (
-            <form onSubmit={onLogout}>
-              <button className="btn-ghost" type="submit">
-                {t('nav.logout')}
-              </button>
-            </form>
+            <button type="button" className="btn-ghost" onClick={() => setLogoutOpen(true)}>
+              {t('nav.logout')}
+            </button>
           ) : (
             <Link href="/login" className="btn-ghost">
               {t('nav.login')}
@@ -70,6 +78,17 @@ export function AppHeader({ signedIn, isAdmin }: { signedIn: boolean; isAdmin: b
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        open={logoutOpen}
+        title={t('confirm.logoutTitle')}
+        description={t('confirm.logoutDescription')}
+        confirmLabel={t('confirm.confirm')}
+        cancelLabel={t('common.cancel')}
+        danger
+        onConfirm={onLogoutConfirm}
+        onCancel={() => setLogoutOpen(false)}
+      />
     </header>
   );
 }

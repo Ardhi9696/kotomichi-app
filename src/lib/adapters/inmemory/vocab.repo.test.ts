@@ -101,4 +101,26 @@ describe('InMemoryVocabRepo', () => {
     await repo.setAppConfig({ ...config, srs: { ...config.srs, dailyNewCap: 5 } });
     expect((await repo.getAppConfig()).srs.dailyNewCap).toBe(5);
   });
+
+  it('audits role changes and tracks last activity', async () => {
+    const repo = new InMemoryVocabRepo();
+    await repo.createUserProfile({
+      id: '22222222-2222-2222-2222-222222222222', displayName: 'Target', role: 'user',
+      preferredLocale: 'en', level: 1, exp: 0, lastReviewDate: null,
+      currentStreak: 0, longestStreak: 0, createdAt: NOW,
+    });
+
+    await repo.applyReview(review(1));
+    await repo.logRoleChange({ userId: '22222222-2222-2222-2222-222222222222', byUserId: DEMO_ADMIN, fromRole: 'user', toRole: 'admin' });
+
+    const changes = await repo.listRoleChanges();
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({ fromRole: 'user', toRole: 'admin', byUserId: DEMO_ADMIN });
+
+    const target = '22222222-2222-2222-2222-222222222222';
+    const activity = await repo.getLastActivityForUsers([target, USER, 'missing-id']);
+    expect(activity[USER]).toBeTruthy();
+    expect(activity[target]).toBeUndefined();
+    expect(activity['missing-id']).toBeUndefined();
+  });
 });

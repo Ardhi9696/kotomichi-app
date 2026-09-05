@@ -13,6 +13,7 @@ import type {
   JlptLevel,
   ReviewLog,
   Role,
+  RoleChange,
   SrsProgress,
   UserProfile,
   Vocabulary,
@@ -92,6 +93,12 @@ export interface VocabRepository {
   listUserProfiles(opts?: { q?: string }): Promise<UserProfile[]>;
   setUserRole(userId: string, role: Role): Promise<void>;
   deleteUser(userId: string): Promise<void>;
+  /** Record an audit entry when a super admin changes someone's role. */
+  logRoleChange(input: { userId: string; byUserId: string; fromRole: Role; toRole: Role }): Promise<void>;
+  /** Most recent role-change audit entries, newest first. */
+  listRoleChanges(limit?: number): Promise<RoleChange[]>;
+  /** userId -> ISO timestamp of the user's last review activity (absent users have no entry). */
+  getLastActivityForUsers(userIds: string[]): Promise<Record<string, string>>;
 
   // ---------- vocabulary content ----------
   searchVocabulary(q: string, opts?: { limit?: number }): Promise<WordCard[]>;

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { requireRole } from '@/lib/server/dal';
 import { getRepository } from '@/lib/server/runtime';
 import type { JlptLevel, Role } from '@/lib/domain';
+import type { TagWithVocabInput } from '@/lib/ports/db-port';
 
 function jlpt(value: string | null): JlptLevel | null {
   const v = String(value ?? '');
@@ -16,6 +17,15 @@ function parseTranslations(formData: FormData): { locale: string; meaning: strin
   for (const locale of ['id', 'en']) {
     const meaning = String(formData.get(`meaning_${locale}`) ?? '').trim();
     if (meaning) out.push({ locale, meaning });
+  }
+  return out;
+}
+
+function parseDynamic(formData: FormData, key: string): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < 50; i++) {
+    const value = String(formData.get(`${key}[${i}]`) ?? '').trim();
+    if (value) out.push(value);
   }
   return out;
 }
@@ -32,8 +42,28 @@ export async function createVocabularyAction(formData: FormData): Promise<void> 
   const partOfSpeech = String(formData.get('partOfSpeech') ?? '').trim() || null;
   const translations = parseTranslations(formData);
 
+  const examples: TagWithVocabInput['examples'] = [];
+  const jpExamples = parseDynamic(formData, 'exampleJp');
+  for (let i = 0; i < jpExamples.length; i++) {
+    const t: { locale: string; translation: string }[] = [];
+    for (const locale of ['id', 'en']) {
+      const translation = String(formData.get(`exampleTr_${i}_${locale}`) ?? '').trim();
+      if (translation) t.push({ locale, translation });
+    }
+    examples.push({ japanese: jpExamples[i], translations: t });
+  }
+
+  const collocations: TagWithVocabInput['collocations'] = [];
+  const collocTexts = parseDynamic(formData, 'collocation');
+  for (let i = 0; i < collocTexts.length; i++) {
+    collocations.push({
+      collocation: collocTexts[i],
+      meaning: String(formData.get(`collocationMeaning[${i}]`) ?? '').trim() || null,
+    });
+  }
+
   await repo.createVocabulary(
-    { kanji, hiragana, romaji, jlptLevel: jlpt(formData.get('jlptLevel') as string | null), partOfSpeech, translations },
+    { kanji, hiragana, romaji, jlptLevel: jlpt(formData.get('jlptLevel') as string | null), partOfSpeech, translations, examples, collocations },
     null,
   );
   revalidatePath('/admin');
@@ -112,18 +142,46 @@ export async function togglePublishAction(formData: FormData): Promise<void> {
 }
 
 export async function setUserRoleAction(formData: FormData): Promise<void> {
-  await requireRole('admin', 'super_admin');
+  const current = await requireRole('super_admin');
   const repo = await getRepository();
   const userId = String(formData.get('userId') ?? '');
   const role = String(formData.get('role') ?? '') as Role;
-  if (userId && ['user','admin','super_admin'].includes(role)) {
-    await repo.setUserRole(userId, role);
+  if (!userId || !['user', 'admin', 'super_admin'].includes(role)) return;
+  if (userId === current.user.id && role !== 'super_admin') return;
+
+  const target = await repo.getUserProfile(userId);
+  if (!target || target.role === role) return;
+
+  if (target.role === 'super_admin' && role !== 'super_admin') {
+    const supers = (await repo.listUserProfiles()).filter((u) => u.role === 'super_admin').length;
+    if (supers <= 1) return; // never drop the last super admin
   }
-  revalidatePath('/admin');
+
+  await repo.setUserRole(userId, role);
+  await repo.logRoleChange({ userId, byUserId: current.user.id, fromRole: target.role, toRole: role });
+  revalidatePath('/admin/users');
+}
+
+export async function deleteUserAction(formData: FormData): Promise<void> {
+  const current = await requireRole('super_admin');
+  const repo = await getRepository();
+  const userId = String(formData.get('userId') ?? '');
+  if (!userId || userId === current.user.id) return;
+
+  const target = await repo.getUserProfile(userId);
+  if (!target) return;
+
+  if (target.role === 'super_admin') {
+    const supers = (await repo.listUserProfiles()).filter((u) => u.role === 'super_admin').length;
+    if (supers <= 1) return; // never delete the last super admin
+  }
+
+  await repo.deleteUser(userId);
+  revalidatePath('/admin/users');
 }
 
 export async function setConfigAction(formData: FormData): Promise<void> {
-  await requireRole('admin', 'super_admin');
+  await requireRole('super_admin');
   const repo = await getRepository();
   const config = await repo.getAppConfig();
   const dailyNewCap = Number(formData.get('dailyNewCap'));
@@ -131,5 +189,5 @@ export async function setConfigAction(formData: FormData): Promise<void> {
   if (Number.isFinite(dailyNewCap) && dailyNewCap > 0) config.srs.dailyNewCap = Math.floor(dailyNewCap);
   if (Number.isFinite(desiredRetention) && desiredRetention > 0 && desiredRetention < 1) config.srs.desiredRetention = desiredRetention;
   await repo.setAppConfig(config);
-  revalidatePath('/admin');
+  revalidatePath('/admin/settings');
 }

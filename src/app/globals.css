@@ -35,6 +35,26 @@
   --font-sans: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --shadow-card: 0 1px 2px rgba(26, 26, 24, 0.06), 0 6px 20px -8px rgba(26, 26, 24, 0.22);
+
+  --animate-shimmer: shimmer 5s linear infinite;
+  --animate-modal-in: modal-in 0.25s ease-out;
+
+  @keyframes shimmer {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 }
 
 @layer base {
@@ -97,5 +117,27 @@
 
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .shimmer-border-bg {
+    background: conic-gradient(
+      from 0deg,
+      rgba(201, 162, 39, 0.12) 0deg,
+      rgba(201, 162, 39, 0.12) 285deg,
+      rgba(201, 162, 39, 0.95) 315deg,
+      rgba(244, 232, 195, 1) 340deg,
+      rgba(201, 162, 39, 0.95) 360deg
+    );
+  }
+
+  .dark .shimmer-border-bg {
+    background: conic-gradient(
+      from 0deg,
+      rgba(244, 232, 195, 0.08) 0deg,
+      rgba(244, 232, 195, 0.08) 285deg,
+      rgba(244, 232, 195, 0.55) 315deg,
+      rgba(255, 255, 255, 0.95) 340deg,
+      rgba(244, 232, 195, 0.55) 360deg
+    );
   }
 }

@@ -160,6 +160,18 @@ CREATE TABLE IF NOT EXISTS review_log (
 
 CREATE INDEX IF NOT EXISTS idx_review_log_user_time ON review_log (user_id, reviewed_at DESC);
 
+-- ---- audit trail of role changes (§ role management) ----
+CREATE TABLE IF NOT EXISTS role_change_log (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         UUID          NOT NULL REFERENCES user_profile (id) ON DELETE CASCADE,
+    by_user_id      UUID          NOT NULL REFERENCES user_profile (id) ON DELETE CASCADE,
+    from_role       TEXT          NOT NULL CHECK (from_role IN ('user', 'admin', 'super_admin')),
+    to_role         TEXT          NOT NULL CHECK (to_role IN ('user', 'admin', 'super_admin')),
+    created_at      TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_role_change_user_time ON role_change_log (user_id, created_at DESC);
+
 -- ------------------------------------------------------------
 -- 5. Configuration (no hardcoding — §9.1)
 -- ------------------------------------------------------------

@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
 import { AuthShell } from '@/components/auth-shell';
 import { RegisterForm } from '@/components/register-form';
+import { isSignupEnabled } from '@/lib/server/runtime';
 
 export const metadata: Metadata = { title: 'Create account — Kotomichi' };
 
 export default async function RegisterPage() {
+  if (!isSignupEnabled()) redirect('/login');
   const t = await getTranslations('auth');
   return (
     <AuthShell>

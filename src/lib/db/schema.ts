@@ -202,6 +202,21 @@ export const reviewLog = pgTable(
   (t) => [index('idx_review_log_user_time').on(t.userId, t.reviewedAt)],
 );
 
+export const roleChangeLog = pgTable(
+  'role_change_log',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    userId: uuid('user_id')
+      .notNull().references(() => userProfile.id, { onDelete: 'cascade' }),
+    byUserId: uuid('by_user_id')
+      .notNull().references(() => userProfile.id, { onDelete: 'cascade' }),
+    fromRole: text('from_role').$type<Role>().notNull(),
+    toRole: text('to_role').$type<Role>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('idx_role_change_user_time').on(t.userId, t.createdAt)],
+);
+
 export const directionThresholds = pgTable('direction_thresholds', {
   direction: smallint('direction').$type<Direction>().primaryKey(),
   fastThresholdMs: integer('fast_threshold_ms').notNull().default(8000),

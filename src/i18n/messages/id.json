@@ -47,6 +47,7 @@
     "emailInUse": "Email ini sudah terdaftar",
     "passwordTooShort": "Kata sandi terlalu pendek (minimal 6 karakter)",
     "rateLimited": "Terlalu banyak percobaan, mohon tunggu",
+    "signupDisabled": "Pendaftaran ditutup. Hubungi admin untuk membuat akun.",
     "confirmEmailFirst": "Konfirmasi email kamu terlebih dahulu",
     "profileLoadFailed": "Gagal memuat profil kamu",
     "sessionFailed": "Sesi gagal dibuat",
@@ -138,7 +139,35 @@
     "dailyNewCap": "Kartu baru per hari",
     "desiredRetention": "Retensi yang diinginkan",
     "directionThreshold": "Buka arah (hari)",
-    "weights": "Bobot FSRS"
+    "weights": "Bobot FSRS",
+    "overviewTitle": "Ringkasan kelola",
+    "overviewSubtitle": "Sekilas basis pelajar dan kontenmu.",
+    "totalUsers": "Pengguna terdaftar",
+    "staff": "Admin",
+    "vocabWords": "Kata kosakata",
+    "decks": "Deck",
+    "recentUsers": "Terdaftar baru-baru ini",
+    "noUsers": "Belum ada pengguna.",
+    "quickActions": "Aksi cepat",
+    "manageContent": "Kelola konten",
+    "manageUsers": "Kelola pengguna",
+    "manageUsersSubtitle": "Naikkan pelajar ke admin atau super admin, atau turunkan kembali.",
+    "settings": "Pengaturan",
+    "searchUsers": "Cari pengguna…",
+    "searchButton": "Cari",
+    "clear": "Bersihkan",
+    "userCount": "pengguna",
+    "noUsersFound": "Tidak ada pengguna yang cocok dengan pencarianmu.",
+    "id": "ID",
+    "lastActive": "Aktif {date}",
+    "neverActive": "Belum pernah beraktivitas",
+    "recentChanges": "Perubahan role terbaru",
+    "noChanges": "Belum ada perubahan role.",
+    "roleChangeLine": "{by} mengubah role {target} dari {from} menjadi {to}",
+    "roleChangeTitle": "Ubah role?",
+    "roleChangeDescription": "Ubah role {name} dari {from} menjadi {to}?",
+    "deleteUserTitle": "Hapus pengguna?",
+    "deleteUserDescription": "Ini menghapus {name} beserta seluruh progresnya secara permanen. Tindakan ini tidak dapat dibatalkan."
   },
   "common": {
     "back": "Kembali",
@@ -149,6 +178,12 @@
     "minutes": "mnt",
     "yes": "Ya",
     "no": "Tidak",
-    "close": "Tutup"
+    "close": "Tutup",
+    "cancel": "Batal"
+  },
+  "confirm": {
+    "logoutTitle": "Keluar dari Kotomichi?",
+    "logoutDescription": "Progresmu tersimpan dan akan menunggu saat kamu kembali.",
+    "confirm": "Keluar"
   }
 }

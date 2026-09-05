@@ -47,6 +47,7 @@
     "emailInUse": "This email is already registered",
     "passwordTooShort": "Password is too short (minimum 6 characters)",
     "rateLimited": "Too many attempts, please wait",
+    "signupDisabled": "Registration is closed. Contact an administrator for an account.",
     "confirmEmailFirst": "Please confirm your email first",
     "profileLoadFailed": "Could not load your profile",
     "sessionFailed": "Session could not be established",
@@ -138,7 +139,35 @@
     "dailyNewCap": "New cards per day",
     "desiredRetention": "Desired retention",
     "directionThreshold": "Direction unlock (days)",
-    "weights": "FSRS weights"
+    "weights": "FSRS weights",
+    "overviewTitle": "Management overview",
+    "overviewSubtitle": "A quick look at your learner base and content.",
+    "totalUsers": "Registered users",
+    "staff": "Admins",
+    "vocabWords": "Vocabulary words",
+    "decks": "Decks",
+    "recentUsers": "Recently registered",
+    "noUsers": "No users yet.",
+    "quickActions": "Quick actions",
+    "manageContent": "Manage content",
+    "manageUsers": "Manage users",
+    "manageUsersSubtitle": "Promote learners to admin or super_admin, or demote them back.",
+    "settings": "Settings",
+    "searchUsers": "Search users…",
+    "searchButton": "Search",
+    "clear": "Clear",
+    "userCount": "users",
+    "noUsersFound": "No users match your search.",
+    "id": "ID",
+    "lastActive": "Active {date}",
+    "neverActive": "Never active",
+    "recentChanges": "Recent role changes",
+    "noChanges": "No role changes yet.",
+    "roleChangeLine": "{by} changed {target}'s role from {from} to {to}",
+    "roleChangeTitle": "Change role?",
+    "roleChangeDescription": "Change {name}'s role from {from} to {to}?",
+    "deleteUserTitle": "Delete user?",
+    "deleteUserDescription": "This permanently removes {name} and all of their progress. This cannot be undone."
   },
   "common": {
     "back": "Back",
@@ -149,6 +178,12 @@
     "minutes": "min",
     "yes": "Yes",
     "no": "No",
-    "close": "Close"
+    "close": "Close",
+    "cancel": "Cancel"
+  },
+  "confirm": {
+    "logoutTitle": "Log out of Kotomichi?",
+    "logoutDescription": "Your progress is saved and will be waiting when you return.",
+    "confirm": "Log out"
   }
 }

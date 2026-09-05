@@ -7,7 +7,7 @@ import { useActionState } from 'react';
 import { signInAction, type ActionState } from '@/app/actions/auth';
 import { PasswordField } from '@/components/password-field';
 
-export function LoginForm() {
+export function LoginForm({ showSignupLink = true }: { showSignupLink?: boolean }) {
   const t = useTranslations('auth');
   const [state, formAction, pending] = useActionState<ActionState, FormData>(signInAction, {});
 
@@ -34,12 +34,14 @@ export function LoginForm() {
         {pending ? '…' : t('submit')}
       </button>
 
-      <p className="text-center text-sm text-ink-500 dark:text-ink-400">
-        {t('noAccount')}{' '}
-        <Link href="/register" className="font-medium text-shu-500 hover:underline">
-          {t('createOne')}
-        </Link>
-      </p>
+      {showSignupLink && (
+        <p className="text-center text-sm text-ink-500 dark:text-ink-400">
+          {t('noAccount')}{' '}
+          <Link href="/register" className="font-medium text-shu-500 hover:underline">
+            {t('createOne')}
+          </Link>
+        </p>
+      )}
     </form>
   );
 }
