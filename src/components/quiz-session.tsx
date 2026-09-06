@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { submitQuizSessionAction, type QuizAnswerOutput } from '@/app/actions/study';
 import { speedForElapsed, type AnswerSpeed, type QuizMode, type QuizQuestion } from '@/lib/srs/quiz';
@@ -74,18 +74,65 @@ export function QuizSession({
   const [pendingAnswers, setPendingAnswers] = useState<PendingAnswer[]>([]);
   const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionComplete, setSessionComplete] = useState(false);
   const shownAt = useRef<number>(0);
 
   const question = questions[index];
   const total = questions.length;
   const done = index >= total;
 
-useEffect(() => {
+  useEffect(() => {
     shownAt.current = Date.now();
   }, [index, done]);
+
+  const toPayload = (a: PendingAnswer) => ({
+    vocabularyId: a.question.vocabularyId,
+    direction: a.question.directionId,
+    elapsedMs: a.elapsedMs,
+    correct: a.correct,
+    answer: a.answer,
+  });
+
+  /** Client-known result (exp is patched in once the server confirms). */
+  const optimistic = (a: PendingAnswer): AnsweredQuestion => ({
+    question: a.question,
+    result: {
+      vocabularyId: a.question.vocabularyId,
+      direction: a.question.directionId,
+      correct: a.correct,
+      elapsedMs: a.elapsedMs,
+      expGained: 0,
+    },
+    speed: speedForElapsed(a.elapsedMs),
+  });
+
+  const submitAll = useCallback(async (answers: PendingAnswer[]) => {
+    if (answers.length === 0) return;
+    setSubmitting(true);
+    setError(null);
+
+    const fd = new FormData();
+    fd.set('answers', JSON.stringify(answers.map(toPayload)));
+    if (sessionId) fd.set('sessionId', String(sessionId));
+
+    try {
+      const res = await submitQuizSessionAction({}, fd);
+      if (res.error) {
+        setError(common('error'));
+        return;
+      }
+      const confirmed = answers.map(optimistic).map((a, i) => ({
+        ...a,
+        result: res.results?.[i] ?? a.result,
+      }));
+      setAnswered((prev) => [...prev, ...confirmed]);
+      setPendingAnswers((prev) => prev.slice(answers.length));
+    } catch {
+      setError(common('error'));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [sessionId, common]);
 
   const choose = (optionText: string) => {
     if (!question || picked) return;
@@ -94,51 +141,20 @@ useEffect(() => {
     const correct = question.options.find((o) => o.text === optionText)?.correct ?? false;
     setPicked(optionText);
 
-    // Store answer locally and trigger background sync
-    setPendingAnswers((prev) => {
-      const newPending = [...prev, { question, correct, elapsedMs, answer: optionText }];
-      // Trigger background sync after state update
-      if (newPending.length >= 3 && !submitting && !syncing && sessionId) {
-        // Use setTimeout to avoid setState in effect
-        setTimeout(() => {
-          if (!submitting && !syncing && sessionId) {
-            setSyncing(true);
-            const fd = new FormData();
-            fd.set('answers', JSON.stringify(newPending.map(a => ({
-              vocabularyId: a.question.vocabularyId,
-              direction: a.question.directionId,
-              elapsedMs: a.elapsedMs,
-              correct: a.correct,
-              answer: a.answer,
-            }))));
-            fd.set('sessionId', String(sessionId));
-            
-            submitQuizSessionAction({}, fd).then((res) => {
-              setSyncing(false);
-              if (!res.error && res.results) {
-                const newAnswered = newPending.map((a, i) => ({
-                  question: a.question,
-                  result: res.results![i],
-                  speed: speedForElapsed(a.elapsedMs),
-                }));
-                setAnswered(prev => [...prev, ...newAnswered]);
-                setPendingAnswers(prev => prev.slice(newPending.length));
-              }
-            }).catch(() => {
-              setSyncing(false);
-            });
-          }
-        }, 0);
-      }
-      return newPending;
-    });
+    const newAnswers = [...pendingAnswers, { question, correct, elapsedMs, answer: optionText }];
+    setPendingAnswers(newAnswers);
 
-    // Auto-advance for correct answers
     if (correct) {
       window.setTimeout(() => {
         setPicked(null);
         setIndex((i) => i + 1);
       }, 900);
+    }
+
+    // Last question answered — submit in the background while the summary
+    // renders instantly from optimistic data.
+    if (index + 1 >= total) {
+      void submitAll(newAnswers);
     }
   };
 
@@ -147,92 +163,31 @@ useEffect(() => {
     setIndex((i) => i + 1);
   };
 
-  // Submit remaining answers when session is done
-  const submitRemaining = async () => {
-    if (pendingAnswers.length === 0) return;
-    
-    setSubmitting(true);
-    setError(null);
-
-    const fd = new FormData();
-    fd.set('answers', JSON.stringify(pendingAnswers.map(a => ({
-      vocabularyId: a.question.vocabularyId,
-      direction: a.question.directionId,
-      elapsedMs: a.elapsedMs,
-      correct: a.correct,
-      answer: a.answer,
-    }))));
-    if (sessionId) fd.set('sessionId', String(sessionId));
-
-    try {
-      const res = await submitQuizSessionAction({}, fd);
-      setSubmitting(false);
-      if (res.error) {
-        setError(common('error'));
-        return;
-      }
-      if (res.results) {
-        const newAnswered = pendingAnswers.map((a, i) => ({
-          question: a.question,
-          result: res.results![i],
-          speed: speedForElapsed(a.elapsedMs),
-        }));
-        setAnswered(prev => [...prev, ...newAnswered]);
-        setPendingAnswers([]);
-        setSessionComplete(true);
-      }
-    } catch {
-      setSubmitting(false);
-      setError(common('error'));
+  // ----- Summary (optimistic: rendered immediately, even before the final
+  // batch answers are confirmed by the server) -----
+  if (done) {
+    if (total === 0) {
+      return (
+        <div className="card flex flex-col items-center gap-4 p-10 text-center">
+          <p className="font-serif text-2xl text-ink-800 dark:text-washi-50">{t('noQuestions')}</p>
+          <Link href="/dashboard" prefetch className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
+            {common('back')}
+          </Link>
+        </div>
+      );
     }
-  };
 
-  // Also submit vocab details to server for persistence
-  useEffect(() => {
-    if (sessionComplete && sessionId && answered.length > 0) {
-      const vocabDetails = buildVocabDetails();
-      const detailPayload = vocabDetails.map(v => ({
-        sessionId,
-        vocabularyId: v.vocabularyId,
-        dir1ElapsedMs: v.directions.find(d => d.dir === 1)?.elapsedMs ?? null,
-        dir1Correct: v.directions.find(d => d.dir === 1)?.correct ?? null,
-        dir1Speed: v.directions.find(d => d.dir === 1)?.speed ?? null,
-        dir1Exp: v.directions.find(d => d.dir === 1)?.expGained ?? 0,
-        dir2ElapsedMs: v.directions.find(d => d.dir === 2)?.elapsedMs ?? null,
-        dir2Correct: v.directions.find(d => d.dir === 2)?.correct ?? null,
-        dir2Speed: v.directions.find(d => d.dir === 2)?.speed ?? null,
-        dir2Exp: v.directions.find(d => d.dir === 2)?.expGained ?? 0,
-        dir3ElapsedMs: v.directions.find(d => d.dir === 3)?.elapsedMs ?? null,
-        dir3Correct: v.directions.find(d => d.dir === 3)?.correct ?? null,
-        dir3Speed: v.directions.find(d => d.dir === 3)?.speed ?? null,
-        dir3Exp: v.directions.find(d => d.dir === 3)?.expGained ?? 0,
-        dir4ElapsedMs: v.directions.find(d => d.dir === 4)?.elapsedMs ?? null,
-        dir4Correct: v.directions.find(d => d.dir === 4)?.correct ?? null,
-        dir4Speed: v.directions.find(d => d.dir === 4)?.speed ?? null,
-        dir4Exp: v.directions.find(d => d.dir === 4)?.expGained ?? 0,
-        dir5ElapsedMs: v.directions.find(d => d.dir === 5)?.elapsedMs ?? null,
-        dir5Correct: v.directions.find(d => d.dir === 5)?.correct ?? null,
-        dir5Speed: v.directions.find(d => d.dir === 5)?.speed ?? null,
-        dir5Exp: v.directions.find(d => d.dir === 5)?.expGained ?? 0,
-        dir6ElapsedMs: v.directions.find(d => d.dir === 6)?.elapsedMs ?? null,
-        dir6Correct: v.directions.find(d => d.dir === 6)?.correct ?? null,
-        dir6Speed: v.directions.find(d => d.dir === 6)?.speed ?? null,
-        dir6Exp: v.directions.find(d => d.dir === 6)?.expGained ?? 0,
-      }));
-      
-      // Fire and forget - persist vocab details
-      fetch('/api/quiz/vocab-details', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ details: detailPayload }),
-      }).catch(() => {});
-    }
-  }, [sessionComplete, sessionId, answered.length]);
+    const reviewed: AnsweredQuestion[] = [...answered, ...pendingAnswers.map(optimistic)];
+    const correctCount = reviewed.filter((a) => a.result.correct).length;
+    const expGained = reviewed.reduce((sum, a) => sum + a.result.expGained, 0);
+    const speedCounts: Record<AnswerSpeed, number> = { easy: 0, good: 0, hard: 0 };
+    for (const a of reviewed) speedCounts[a.speed] += 1;
+    const avgSeconds = reviewed.length
+      ? Math.round((reviewed.reduce((s, a) => s + a.result.elapsedMs, 0) / reviewed.length / 1000) * 10) / 10
+      : 0;
 
-  // Build per-vocabulary direction details
-  const buildVocabDetails = () => {
     const byVocab = new Map<number, SessionAnswerDetail>();
-    for (const a of answered) {
+    for (const a of reviewed) {
       const vid = a.question.vocabularyId;
       const existing = byVocab.get(vid) ?? { vocabularyId: vid, front: a.question.front, directions: [] };
       existing.directions.push({
@@ -244,21 +199,10 @@ useEffect(() => {
       });
       byVocab.set(vid, existing);
     }
-    return [...byVocab.values()].sort((a, b) => a.vocabularyId - b.vocabularyId);
-  };
+    const vocabDetails = [...byVocab.values()].sort((a, b) => a.vocabularyId - b.vocabularyId);
 
-  // ----- Session Complete Screen -----
-  if (sessionComplete && answered.length > 0) {
-    const correctCount = answered.filter((a) => a.result.correct).length;
-    const expGained = answered.reduce((sum, a) => sum + a.result.expGained, 0);
-    const speedCounts: Record<AnswerSpeed, number> = { easy: 0, good: 0, hard: 0 };
-    for (const a of answered) speedCounts[a.speed] += 1;
-    const avgSeconds = answered.length
-      ? Math.round((answered.reduce((s, a) => s + a.result.elapsedMs, 0) / answered.length / 1000) * 10) / 10
-      : 0;
-
-    const vocabDetails = buildVocabDetails();
     const isLastSession = sessionIndex >= totalSessions - 1;
+    const saving = pendingAnswers.length > 0;
 
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6 sm:p-8">
@@ -268,12 +212,30 @@ useEffect(() => {
             {t('sessionProgress', { current: sessionIndex + 1, total: totalSessions })}
           </p>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-            {t('summaryScore', { correct: correctCount, total: answered.length })}
+            {t('summaryScore', { correct: correctCount, total: reviewed.length })}
           </p>
           {expGained > 0 && (
             <p className="mt-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
               {tLearn('expGained', { exp: expGained })}
             </p>
+          )}
+          {saving && (
+            <p className="mt-2 flex items-center justify-center gap-2 text-xs text-ink-500 dark:text-ink-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+              {t('submitting')}
+            </p>
+          )}
+          {error && (
+            <div className="mt-2 flex items-center justify-center gap-3 text-sm text-shu-600 dark:text-shu-400">
+              <span>{common('error')}</span>
+              <button
+                type="button"
+                className="rounded-full border border-shu-500/50 px-3 py-1 text-xs font-semibold transition-colors hover:bg-shu-500/10"
+                onClick={() => setError(null)}
+              >
+                {t('tryAgain')}
+              </button>
+            </div>
           )}
         </div>
 
@@ -336,25 +298,26 @@ useEffect(() => {
         <div className="mt-1 flex flex-wrap items-center justify-center gap-3">
           {isLastSession ? (
             <>
-              <Link href="/dashboard" className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
+              <Link href="/dashboard" prefetch className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
                 {t('finish')} → {t('backToDashboard')}
               </Link>
-              <Link href={`/learn?deck=${deckId}`} className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
+              <Link href={`/learn?deck=${deckId}`} prefetch className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
                 {t('repeatDeck')}
               </Link>
             </>
           ) : (
             <>
-              <Link 
+              <Link
                 href={`/quiz?deck=${deckId}&mode=${mode}&session=${sessionIndex + 1}`}
+                prefetch
                 className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700"
               >
                 → {t('nextSession')} ({sessionIndex + 2}/{totalSessions})
               </Link>
-              <Link href={`/learn?deck=${deckId}`} className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
+              <Link href={`/learn?deck=${deckId}`} prefetch className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
                 {t('repeatDeck')}
               </Link>
-              <Link href="/dashboard" className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
+              <Link href="/dashboard" prefetch className="rounded-full border border-ink-300 px-4 py-2 text-sm font-semibold text-ink-600 transition-colors hover:border-ink-400 dark:border-ink-700 dark:text-washi-100 dark:hover:border-ink-500">
                 {t('backToDashboard')}
               </Link>
             </>
@@ -364,50 +327,11 @@ useEffect(() => {
     );
   }
 
-  // Auto-submit when session is done (no manual button needed)
-  useEffect(() => {
-    if (done && !submitting && !sessionComplete && pendingAnswers.length > 0) {
-      void submitRemaining();
-    }
-  }, [done, pendingAnswers.length, sessionComplete, submitting]);
-
-  // Loading state while submitting final answers
-  if (done && submitting) {
-    return (
-      <div className="card mx-auto flex w-full max-w-2xl flex-col items-center gap-4 p-10 text-center">
-        <p className="font-serif text-2xl text-ink-800 dark:text-washi-50">{t('submitting')}</p>
-        <p className="text-sm text-ink-500 dark:text-ink-400">{common('loading')}</p>
-      </div>
-    );
-  }
-
-  // Error state
-  if (done && error) {
-    return (
-      <div className="card mx-auto flex w-full max-w-2xl flex-col items-center gap-4 p-10 text-center">
-        <p className="font-serif text-2xl text-shu-600 dark:text-shu-400">{common('error')}</p>
-        <p className="text-sm text-ink-500 dark:text-ink-400">{error}</p>
-        <button
-          type="button"
-          className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700"
-          onClick={() => {
-            setSubmitting(false);
-            setError(null);
-            setIndex(0);
-            setPendingAnswers([]);
-          }}
-        >
-          {t('tryAgain')}
-        </button>
-      </div>
-    );
-  }
-
   if (!question) {
     return (
       <div className="card flex flex-col items-center gap-4 p-10 text-center">
         <p className="font-serif text-2xl text-ink-800 dark:text-washi-50">{t('noQuestions')}</p>
-        <Link href="/dashboard" className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
+        <Link href="/dashboard" prefetch className="rounded-full bg-shu-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-shu-700">
           {common('back')}
         </Link>
       </div>
@@ -415,7 +339,8 @@ useEffect(() => {
   }
 
   const reveal = picked !== null;
-  const lastAnswerCorrect = pendingAnswers.length > 0 ? pendingAnswers[pendingAnswers.length - 1].correct : false;
+  const lastAnswer = pendingAnswers[pendingAnswers.length - 1] ?? null;
+  const lastAnswerCorrect = lastAnswer?.correct ?? false;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -449,8 +374,7 @@ useEffect(() => {
         }`}>
           {t(mode === 'hard' ? 'modeHard' : 'modeNormal')}
         </span>
-        {/* Sync status badge */}
-        {(syncing || pendingAnswers.length > 0) && (
+        {submitting && (
           <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             {t('syncing')}
