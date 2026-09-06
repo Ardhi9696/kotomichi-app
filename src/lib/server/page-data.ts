@@ -22,7 +22,7 @@ export async function loadReviewPageData(): Promise<ReviewPageData> {
     locale: profile.preferredLocale,
   });
 
-  return { dueCount: queue.dueCount, firstDue: queue.due[0] ?? null };
+  return { dueCount: queue.dueCount, queue: [...queue.due, ...queue.newCards] };
 }
 
 export async function loadLearnPageData(deckId: number): Promise<LearnPageData | null> {

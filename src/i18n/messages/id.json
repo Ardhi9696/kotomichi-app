@@ -179,7 +179,15 @@
     "done": "Sesi selesai. Kerja bagus!",
     "hint": "ketuk untuk lihat",
     "tooFast": "Kamu menjawab sangat cepat — Easy.",
-    "tooSlow": "Sedikit lama — dicatat Hard."
+    "tooSlow": "Sedikit lama — dicatat Hard.",
+    "showAnswer": "Lihat jawaban",
+    "iKnew": "Aku tahu",
+    "iForgot": "Aku tidak tahu",
+    "correct": "Benar",
+    "incorrect": "Belum tepat",
+    "expGained": "+{exp} EXP",
+    "meaning": "Arti",
+    "example": "Contoh"
   },
   "quiz": {
     "summaryTitle": "Kuis selesai!",

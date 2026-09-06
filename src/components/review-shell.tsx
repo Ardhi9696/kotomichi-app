@@ -20,7 +20,7 @@ export function ReviewShell({ initial }: { initial: ReviewPageData }) {
         </p>
       </section>
 
-      <FlashcardSession initial={data.firstDue} kind="review" />
+      <FlashcardSession queue={data.queue} />
     </div>
   );
 }

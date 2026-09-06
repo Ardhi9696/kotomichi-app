@@ -179,7 +179,15 @@
     "done": "Session complete. Well done!",
     "hint": "tap to reveal",
     "tooFast": "You answered very quickly — Easy.",
-    "tooSlow": "Took you a bit — noted as Hard."
+    "tooSlow": "Took you a bit — noted as Hard.",
+    "showAnswer": "Show answer",
+    "iKnew": "I knew it",
+    "iForgot": "I didn't know",
+    "correct": "Correct",
+    "incorrect": "Not quite",
+    "expGained": "+{exp} EXP",
+    "meaning": "Meaning",
+    "example": "Example"
   },
   "quiz": {
     "summaryTitle": "Quiz complete!",

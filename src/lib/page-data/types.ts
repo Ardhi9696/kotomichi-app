@@ -3,7 +3,8 @@ import type { PartOfSpeech, StudyCard } from '@/lib/domain';
 /** Snapshot rendered by the /review page and revalidated by SWR. */
 export interface ReviewPageData {
   dueCount: number;
-  firstDue: StudyCard | null;
+  /** Full session queue (due + new cards) preloaded so review runs client-side. */
+  queue: StudyCard[];
 }
 
 export interface LearnWordRow {
