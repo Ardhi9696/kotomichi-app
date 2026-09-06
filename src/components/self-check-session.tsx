@@ -9,6 +9,8 @@ import { posLabel } from '@/lib/srs/pos-label';
 import type { StudyCard } from '@/lib/domain';
 
 const SWIPE_THRESHOLD = 64;
+/** How far the card flies off-screen before the next card slides in. */
+const SWIPE_FLY_MS = 260;
 
 export function SelfCheckSession({
   cards: initialCards,
@@ -24,12 +26,12 @@ export function SelfCheckSession({
   const [sessionCards, setSessionCards] = useState<StudyCard[]>(initialCards);
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rememberedCards, setRememberedCards] = useState<StudyCard[]>([]);
   const [forgottenCards, setForgottenCards] = useState<StudyCard[]>([]);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const [flyOut, setFlyOut] = useState<'left' | 'right' | null>(null);
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const shownAt = useRef<number | null>(null);
@@ -44,36 +46,39 @@ export function SelfCheckSession({
   const answered = Math.min(index, total);
   const progressPct = total === 0 ? 0 : Math.round((answered / total) * 100);
 
-  const answer = async (correct: boolean) => {
-    if (pending) return;
+  const answer = (correct: boolean) => {
+    if (flyOut !== null) return;
     const card = sessionCards[index];
     if (!card) return;
-    const start = shownAt.current ?? Date.now();
-    const elapsedMs = Date.now() - start;
-    shownAt.current = Date.now();
-    setPending(true);
-    setError(null);
-    setFlipped(false);
+    const elapsedMs = Date.now() - (shownAt.current ?? Date.now());
+
+    // Optimistic: record locally and fly the card off immediately, then let
+    // the next card take its place — the SRS submit runs in the background.
+    setFlyOut(correct ? 'right' : 'left');
+    setDragging(false);
     setDragX(0);
+    setError(null);
+
+    if (correct) {
+      setRememberedCards((prev) => [...prev, card]);
+    } else {
+      setForgottenCards((prev) => [...prev, card]);
+    }
 
     const fd = new FormData();
     fd.set('vocabularyId', String(card.vocabularyId));
     fd.set('direction', String(card.direction));
     fd.set('elapsedMs', String(Math.max(0, elapsedMs)));
     fd.set('correct', String(correct));
+    void submitSelfCheckAction({}, fd).then((res) => {
+      if (res?.error) setError(common('error'));
+    });
 
-    const res = await submitSelfCheckAction({}, fd);
-    setPending(false);
-    if (res.error) {
-      setError(common('error'));
-      return;
-    }
-    if (correct) {
-      setRememberedCards((prev) => [...prev, card]);
-    } else {
-      setForgottenCards((prev) => [...prev, card]);
-    }
-    setIndex((i) => i + 1);
+    window.setTimeout(() => {
+      setFlyOut(null);
+      setFlipped(false);
+      setIndex((i) => i + 1);
+    }, SWIPE_FLY_MS);
   };
 
   const repeatForgotten = () => {
@@ -193,8 +198,24 @@ export function SelfCheckSession({
 
   const card = sessionCards[index];
 
+  const flySign = flyOut === 'right' ? 1 : flyOut === 'left' ? -1 : 0;
+  const flipSuffix = flipped ? ' rotateY(180deg)' : '';
+  let cardTransform: string;
+  let cardTransition: string | undefined;
+  if (dragging) {
+    // Track the finger instantly — no transition lag on every move.
+    cardTransform = `translateX(${dragX}px) rotate(${dragX / 14}deg)${flipSuffix}`;
+    cardTransition = 'none';
+  } else if (flyOut) {
+    cardTransform = `translateX(${flySign * 600}px) rotate(${flySign * 30}deg)${flipSuffix}`;
+    cardTransition = `transform ${SWIPE_FLY_MS}ms ease-out, opacity 180ms ease-out`;
+  } else {
+    cardTransform = flipped ? `rotateY(180deg)` : 'translate3d(0,0,0)';
+    cardTransition = 'transform 300ms ease';
+  }
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (pending) return;
+    if (flyOut !== null) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -219,10 +240,11 @@ export function SelfCheckSession({
     startX.current = null;
     startY.current = null;
     setDragging(false);
-    setDragX(0);
     if (Math.abs(dx) >= SWIPE_THRESHOLD) {
       dragState.current = 'swipe';
-      void answer(dx > 0);
+      answer(dx > 0);
+    } else {
+      setDragX(0);
     }
   };
 
@@ -279,15 +301,18 @@ export function SelfCheckSession({
         <button
           type="button"
           onClick={onCardClick}
-          disabled={pending}
+          disabled={flyOut !== null}
           className="relative block h-80 w-full select-none outline-none"
           aria-label={t('flipHint')}
         >
           <div
-            className={`relative h-full w-full transition-transform duration-300 [transform-style:preserve-3d] ${
-              flipped ? '[transform:rotateY(180deg)]' : ''
-            } ${dragging ? 'pointer-events-none' : ''}`}
-            style={{ transform: dragging ? `translateX(${dragX}px) rotate(${dragX / 14}deg)` : undefined }}
+            key={card.id}
+            className="relative h-full w-full [transform-style:preserve-3d]"
+            style={{
+              transform: cardTransform,
+              transition: cardTransition,
+              opacity: flyOut ? 0 : 1,
+            }}
           >
             {/* Front */}
             <div className="card absolute inset-0 flex flex-col items-center justify-center gap-3 p-10 text-center [backface-visibility:hidden]">
@@ -343,16 +368,16 @@ export function SelfCheckSession({
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
-          disabled={pending}
-          onClick={() => void answer(false)}
+          disabled={flyOut !== null}
+          onClick={() => answer(false)}
           className="rounded-xl border border-shu-500/50 px-4 py-3 font-medium text-shu-600 transition-colors hover:bg-shu-500/10 disabled:opacity-50 dark:text-shu-300"
         >
           {t('notYet')}
         </button>
         <button
           type="button"
-          disabled={pending}
-          onClick={() => void answer(true)}
+          disabled={flyOut !== null}
+          onClick={() => answer(true)}
           className="rounded-xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-3 font-medium text-emerald-600 transition-colors hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-300"
         >
           {t('remember')}
