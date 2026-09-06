@@ -91,6 +91,7 @@ export default async function QuizPage({
         </p>
       </div>
       <QuizSession 
+        key={quizSession.id}
         questions={questions} 
         deckId={active.deck.id} 
         deckTitle={active.deck.title} 
