@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
@@ -15,28 +16,14 @@ const OVERVIEW_WINDOW_DAYS = 30;
 
 export default async function DashboardPage() {
   const t = await getTranslations('dashboard');
-  const to = await getTranslations('dashboard.overview');
-  const { user, profile, repo, config } = await getStudyContext();
+  const { user, profile, config } = await getStudyContext();
 
   if (profile.role === 'admin' || profile.role === 'super_admin') {
     return <AdminOverview currentRole={profile.role} />;
   }
 
-  const now = new Date().toISOString();
-
-  const [dueCount, newToday, studySeconds, activity, recent] = await Promise.all([
-    repo.countDue(user.id, now),
-    repo.countNewReviews(user.id, now.slice(0, 10) + 'T00:00:00.000Z'),
-    repo.getStudySeconds(user.id, 1),
-    repo.getActivity(user.id, OVERVIEW_WINDOW_DAYS),
-    repo.getRecentLogs(user.id, 8),
-  ]);
-
-  const overview = computeOverview(activity, new Date(), OVERVIEW_WINDOW_DAYS);
-
-  const lvl = levelFromExp(profile.exp, config.exp.base);
-  const newRemaining = Math.max(0, config.srs.dailyNewCap - newToday);
-
+  // The shell (title + menu) streams first; each DB-backed section loads in
+  // the background and fills in as its data arrives (hybrid rendering).
   return (
     <div className="flex flex-col gap-6">
       <section>
@@ -44,82 +31,166 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label={t('level')} value={String(lvl.level)} hint={`${profile.exp} EXP`} />
-        <Stat label={t('streak')} value={`${profile.currentStreak}`} hint={profile.currentStreak > 0 ? '🔥' : undefined} />
-        <Stat label={t('due')} value={String(dueCount)} hint={dueCount ? t('wordCount') : undefined} />
-        <Stat label={t('newToday')} value={String(newRemaining)} hint={`/ ${config.srs.dailyNewCap}`} />
-      </section>
+      <Suspense fallback={<StatsSkeleton />}>
+        <StatsSection />
+      </Suspense>
 
-      {/* Overview: calendar + consistency */}
-      <section className="card p-6">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 className="font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{to('title')}</h2>
-            <p className="text-sm text-ink-500 dark:text-ink-400">{to('subtitle')}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <Metric value={String(overview.todayMinutes)} label={to('todayMinutes')} accent />
-            <Metric value={`${overview.currentStreak}`} label={to('currentStreak')} />
-            <Metric value={String(overview.daysThisMonth)} label={to('daysThisMonth')} />
-            <Metric value={String(overview.totalMinutes)} label={to('totalMinutes')} />
-          </div>
-        </div>
-        <OverviewCalendar monthCells={overview.monthCells} monthYear={overview.monthYear} />
-      </section>
+      <Suspense fallback={<OverviewSkeleton />}>
+        <OverviewSection />
+      </Suspense>
 
       {/* Menu */}
       <section>
         <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('menu')}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <MenuCard href="/learn" title={t('menuLearn')} description={t('menuLearnDescription')} icon="学" />
-          <MenuCard href="/review" title={t('menuReview')} description={t('menuReviewDescription')} icon="復" badge={dueCount > 0 ? String(dueCount) : undefined} />
+          <MenuCard
+            href="/review"
+            title={t('menuReview')}
+            description={t('menuReviewDescription')}
+            icon="復"
+            badge={
+              <Suspense fallback={null}>
+                <ReviewBadge userId={user.id} newDailyCap={config.srs.dailyNewCap} />
+              </Suspense>
+            }
+          />
           <MenuCard href="/words" title={t('menuSearch')} description={t('menuSearchDescription')} icon="索" />
         </div>
       </section>
 
-      {dueCount > 0 && (
-        <Link href="/review" className="card group flex items-center justify-between px-5 py-4 transition-colors hover:border-kintsugi-500/50">
-          <span className="text-sm text-ink-700 dark:text-ink-200">
-            {t('dueStrip', { count: dueCount })}
-          </span>
-          <span className="text-sm font-medium text-shu-500">{t('startReview')} →</span>
-        </Link>
-      )}
+      <Suspense fallback={null}>
+        <DueStrip />
+      </Suspense>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <div className="card p-6">
-          <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('activity')}</h2>
-          {recent.length === 0 ? (
-            <p className="text-sm text-ink-500 dark:text-ink-400">{t('noActivity')}</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-ink-200/70 dark:divide-ink-800">
-              {recent.map((r) => (
-                <li key={r.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="flex items-center gap-2">
-                    <span className={r.correctness ? 'text-kintsugi-500' : 'text-shu-500'}>{r.correctness ? '✓' : '✗'}</span>
-                    <span className="text-ink-600 dark:text-ink-300">dir{r.direction}</span>
-                  </span>
-                  <span className="text-ink-400">{r.reviewedAt.slice(0, 16).replace('T', ' ')}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="card p-6">
-          <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">
-            {t('reviewsToday', { count: recent.length })}
-          </h2>
-          <p className="flex items-center gap-2 text-3xl font-bold text-shu-500">
-            {Math.round(studySeconds / 60)}
-            <span className="text-sm font-normal text-ink-500 dark:text-ink-400">{t('minutesToday', { minutes: '(min)' })}</span>
-          </p>
-          <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
-            {profile.level} {t('level')} · {profile.exp} EXP
-          </p>
-        </div>
-      </section>
+      <Suspense fallback={<ActivitySkeleton />}>
+        <ActivitySection />
+      </Suspense>
     </div>
+  );
+}
+
+async function StatsSection() {
+  const t = await getTranslations('dashboard');
+  const { user, profile, repo, config } = await getStudyContext();
+
+  const now = new Date().toISOString();
+  const [dueCount, newToday] = await Promise.all([
+    repo.countDue(user.id, now),
+    repo.countNewReviews(user.id, now.slice(0, 10) + 'T00:00:00.000Z'),
+  ]);
+
+  const lvl = levelFromExp(profile.exp, config.exp.base);
+  const newRemaining = Math.max(0, config.srs.dailyNewCap - newToday);
+
+  return (
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <Stat label={t('level')} value={String(lvl.level)} hint={`${profile.exp} EXP`} />
+      <Stat label={t('streak')} value={`${profile.currentStreak}`} hint={profile.currentStreak > 0 ? '🔥' : undefined} />
+      <Stat label={t('due')} value={String(dueCount)} hint={dueCount ? t('wordCount') : undefined} />
+      <Stat label={t('newToday')} value={String(newRemaining)} hint={`/ ${config.srs.dailyNewCap}`} />
+    </section>
+  );
+}
+
+async function OverviewSection() {
+  const to = await getTranslations('dashboard.overview');
+  const { user, repo } = await getStudyContext();
+
+  const activity = await repo.getActivity(user.id, OVERVIEW_WINDOW_DAYS);
+  const overview = computeOverview(activity, new Date(), OVERVIEW_WINDOW_DAYS);
+
+  return (
+    <section className="card p-6">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{to('title')}</h2>
+          <p className="text-sm text-ink-500 dark:text-ink-400">{to('subtitle')}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Metric value={String(overview.todayMinutes)} label={to('todayMinutes')} accent />
+          <Metric value={`${overview.currentStreak}`} label={to('currentStreak')} />
+          <Metric value={String(overview.daysThisMonth)} label={to('daysThisMonth')} />
+          <Metric value={String(overview.totalMinutes)} label={to('totalMinutes')} />
+        </div>
+      </div>
+      <OverviewCalendar monthCells={overview.monthCells} monthYear={overview.monthYear} />
+    </section>
+  );
+}
+
+async function DueStrip() {
+  const t = await getTranslations('dashboard');
+  const { user, repo } = await getStudyContext();
+  const dueCount = await repo.countDue(user.id, new Date().toISOString());
+
+  if (dueCount <= 0) return null;
+
+  return (
+    <Link href="/review" className="card group flex items-center justify-between px-5 py-4 transition-colors hover:border-kintsugi-500/50">
+      <span className="text-sm text-ink-700 dark:text-ink-200">
+        {t('dueStrip', { count: dueCount })}
+      </span>
+      <span className="text-sm font-medium text-shu-500">{t('startReview')} →</span>
+    </Link>
+  );
+}
+
+async function ReviewBadge({ userId, newDailyCap }: { userId: string; newDailyCap: number }) {
+  const { repo } = await getStudyContext();
+  const now = new Date().toISOString();
+  const [dueCount, newToday] = await Promise.all([
+    repo.countDue(userId, now),
+    repo.countNewReviews(userId, now.slice(0, 10) + 'T00:00:00.000Z'),
+  ]);
+  const newRemaining = Math.max(0, newDailyCap - newToday);
+  const count = dueCount + newRemaining;
+  if (count <= 0) return null;
+  return <span className="chip bg-shu-500/10 text-shu-500">{String(count)}</span>;
+}
+
+async function ActivitySection() {
+  const t = await getTranslations('dashboard');
+  const { user, profile, repo } = await getStudyContext();
+
+  const [studySeconds, recent] = await Promise.all([
+    repo.getStudySeconds(user.id, 1),
+    repo.getRecentLogs(user.id, 8),
+  ]);
+
+  return (
+    <section className="grid gap-3 sm:grid-cols-2">
+      <div className="card p-6">
+        <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('activity')}</h2>
+        {recent.length === 0 ? (
+          <p className="text-sm text-ink-500 dark:text-ink-400">{t('noActivity')}</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-ink-200/70 dark:divide-ink-800">
+            {recent.map((r) => (
+              <li key={r.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  <span className={r.correctness ? 'text-kintsugi-500' : 'text-shu-500'}>{r.correctness ? '✓' : '✗'}</span>
+                  <span className="text-ink-600 dark:text-ink-300">dir{r.direction}</span>
+                </span>
+                <span className="text-ink-400">{r.reviewedAt.slice(0, 16).replace('T', ' ')}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="card p-6">
+        <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">
+          {t('reviewsToday', { count: recent.length })}
+        </h2>
+        <p className="flex items-center gap-2 text-3xl font-bold text-shu-500">
+          {Math.round(studySeconds / 60)}
+          <span className="text-sm font-normal text-ink-500 dark:text-ink-400">{t('minutesToday', { minutes: '(min)' })}</span>
+        </p>
+        <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
+          {profile.level} {t('level')} · {profile.exp} EXP
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -143,7 +214,7 @@ function MenuCard({
   title: string;
   description: string;
   icon: string;
-  badge?: string;
+  badge?: React.ReactNode;
 }) {
   return (
     <Link
@@ -154,9 +225,7 @@ function MenuCard({
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-shu-500/10 font-serif text-lg text-shu-500">
           {icon}
         </span>
-        {badge && (
-          <span className="chip bg-shu-500/10 text-shu-500">{badge}</span>
-        )}
+        {badge}
       </div>
       <span className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">{title}</span>
       <span className="text-sm text-ink-500 dark:text-ink-400">{description}</span>
@@ -182,18 +251,6 @@ const ROLE_LABEL: Record<Role, string> = {
 
 async function AdminOverview({ currentRole }: { currentRole: Role }) {
   const t = await getTranslations('admin');
-  const { repo } = await getStudyContext();
-
-  const [users, words, decks] = await Promise.all([
-    repo.listUserProfiles(),
-    repo.searchVocabulary('', { limit: 10000 }),
-    repo.listDecks(),
-  ]);
-  const activity = await repo.getLastActivityForUsers(users.map((u) => u.id));
-
-  const roleCounts: Record<Role, number> = { super_admin: 0, admin: 0, user: 0 };
-  for (const u of users) roleCounts[u.role] += 1;
-  const recent = [...users].reverse().slice(0, 5);
 
   return (
     <div className="flex flex-col gap-6">
@@ -202,48 +259,137 @@ async function AdminOverview({ currentRole }: { currentRole: Role }) {
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('overviewSubtitle')}</p>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label={t('totalUsers')} value={String(users.length)} />
-        <Stat label={t('staff')} value={String(roleCounts.admin + roleCounts.super_admin)} />
-        <Stat label={t('vocabWords')} value={String(words.length)} />
-        <Stat label={t('decks')} value={String(decks.length)} />
-      </section>
+      <Suspense fallback={<StatsSkeleton />}>
+        <AdminStats />
+      </Suspense>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <div className="card p-6">
-          <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('recentUsers')}</h2>
-          {users.length === 0 ? (
-            <p className="text-sm text-ink-500 dark:text-ink-400">{t('noUsers')}</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-ink-200/70 dark:divide-ink-800">
-              {recent.map((u) => (
-                <li key={u.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-ink-700 dark:text-ink-200">{u.displayName}</span>
-                    <span className="text-xs text-ink-400">
-                      <ActivityLabel iso={activity[u.id]} />
-                    </span>
+      <Suspense fallback={<ActivitySkeleton />}>
+        <AdminPanels currentRole={currentRole} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function AdminStats() {
+  const t = await getTranslations('admin');
+  const { repo } = await getStudyContext();
+
+  const [users, words, decks] = await Promise.all([
+    repo.listUserProfiles(),
+    repo.searchVocabulary('', { limit: 10000 }),
+    repo.listDecks(),
+  ]);
+
+  const roleCounts: Record<Role, number> = { super_admin: 0, admin: 0, user: 0 };
+  for (const u of users) roleCounts[u.role] += 1;
+
+  return (
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <Stat label={t('totalUsers')} value={String(users.length)} />
+      <Stat label={t('staff')} value={String(roleCounts.admin + roleCounts.super_admin)} />
+      <Stat label={t('vocabWords')} value={String(words.length)} />
+      <Stat label={t('decks')} value={String(decks.length)} />
+    </section>
+  );
+}
+
+async function AdminPanels({ currentRole }: { currentRole: Role }) {
+  const t = await getTranslations('admin');
+  const { repo } = await getStudyContext();
+
+  const users = await repo.listUserProfiles();
+  const activity = await repo.getLastActivityForUsers(users.map((u) => u.id));
+  const recent = [...users].reverse().slice(0, 5);
+
+  return (
+    <section className="grid gap-3 sm:grid-cols-2">
+      <div className="card p-6">
+        <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('recentUsers')}</h2>
+        {users.length === 0 ? (
+          <p className="text-sm text-ink-500 dark:text-ink-400">{t('noUsers')}</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-ink-200/70 dark:divide-ink-800">
+            {recent.map((u) => (
+              <li key={u.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-ink-700 dark:text-ink-200">{u.displayName}</span>
+                  <span className="text-xs text-ink-400">
+                    <ActivityLabel iso={activity[u.id]} />
                   </span>
-                  <span className="chip bg-washi-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">{ROLE_LABEL[u.role]}</span>
-                </li>
-              ))}
-            </ul>
+                </span>
+                <span className="chip bg-washi-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">{ROLE_LABEL[u.role]}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="card p-6">
+        <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('quickActions')}</h2>
+        <div className="flex flex-col gap-2">
+          <Link href="/admin/content" className="btn-primary">{t('manageContent')}</Link>
+          {currentRole === 'super_admin' && (
+            <>
+              <Link href="/admin/users" className="btn-ghost">{t('manageUsers')}</Link>
+              <Link href="/admin/settings" className="btn-ghost">{t('settings')}</Link>
+            </>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <div className="card p-6">
-          <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('quickActions')}</h2>
-          <div className="flex flex-col gap-2">
-            <Link href="/admin/content" className="btn-primary">{t('manageContent')}</Link>
-            {currentRole === 'super_admin' && (
-              <>
-                <Link href="/admin/users" className="btn-ghost">{t('manageUsers')}</Link>
-                <Link href="/admin/settings" className="btn-ghost">{t('settings')}</Link>
-              </>
-            )}
+function StatsSkeleton() {
+  return (
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-hidden>
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="card p-4">
+          <div className="h-3 w-3/4 animate-pulse rounded bg-ink-200/70 dark:bg-ink-800" />
+          <div className="mt-3 h-6 w-1/2 animate-pulse rounded bg-ink-200/70 dark:bg-ink-800" />
+          <div className="mt-2 h-3 w-2/5 animate-pulse rounded bg-ink-200/50 dark:bg-ink-800/60" />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function OverviewSkeleton() {
+  return (
+    <section className="card p-6" aria-hidden>
+      <div className="flex items-end justify-between">
+        <div>
+          <div className="h-5 w-36 animate-pulse rounded bg-ink-200/70 dark:bg-ink-800" />
+          <div className="mt-2 h-3 w-48 animate-pulse rounded bg-ink-200/50 dark:bg-ink-800/60" />
+        </div>
+        <div className="flex gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-9 w-16 animate-pulse rounded-xl bg-ink-200/50 dark:bg-ink-800/60" />
+          ))}
+        </div>
+      </div>
+      <div className="mt-5 grid grid-cols-7 gap-1">
+        {Array.from({ length: 28 }).map((_, i) => (
+          <div key={i} className="aspect-square animate-pulse rounded-lg bg-ink-200/40 dark:bg-ink-800/50" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ActivitySkeleton() {
+  return (
+    <section className="grid gap-3 sm:grid-cols-2" aria-hidden>
+      {[0, 1].map((i) => (
+        <div key={i} className="card p-6">
+          <div className="h-5 w-32 animate-pulse rounded bg-ink-200/70 dark:bg-ink-800" />
+          <div className="mt-4 space-y-3">
+            {[0, 1, 2].map((j) => (
+              <div key={j} className="h-4 animate-pulse rounded bg-ink-200/50 dark:bg-ink-800/60" />
+            ))}
           </div>
         </div>
-      </section>
-    </div>
+      ))}
+    </section>
   );
 }
