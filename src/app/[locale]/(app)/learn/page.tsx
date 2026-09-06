@@ -1,18 +1,20 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
-import { loadLearnPageData } from '@/lib/server/page-data';
+import { requireLearner } from '@/lib/server/dal';
 import { LearnShell } from '@/components/learn-shell';
 
 export const metadata: Metadata = { title: 'Learn — Kotomichi' };
 
-export default async function LearnPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ deck?: string }>;
-}) {
-  const { deck } = await searchParams;
-  const data = await loadLearnPageData(Number(deck));
-  if (!data) redirect('/dashboard');
-  return <LearnShell {...data} />;
+export default async function LearnPage() {
+  await requireLearner();
+
+  // Deck data loads via SWR in the client shell (instant learn-shaped
+  // skeleton, cached across navigations) instead of blocking the server
+  // render — the same pattern as /quiz.
+  return (
+    <Suspense>
+      <LearnShell />
+    </Suspense>
+  );
 }
