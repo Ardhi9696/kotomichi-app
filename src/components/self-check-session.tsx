@@ -33,7 +33,7 @@ export function SelfCheckSession({
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
   const shownAt = useRef<number | null>(null);
-  const skipClick = useRef(false);
+  const dragState = useRef<'idle' | 'swipe' | 'tap'>('idle');
 
   useEffect(() => {
     shownAt.current = Date.now();
@@ -51,7 +51,6 @@ export function SelfCheckSession({
     const start = shownAt.current ?? Date.now();
     const elapsedMs = Date.now() - start;
     shownAt.current = Date.now();
-    skipClick.current = true;
     setPending(true);
     setError(null);
     setFlipped(false);
@@ -196,6 +195,12 @@ export function SelfCheckSession({
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (pending) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // pointer already released — ignore
+    }
+    dragState.current = 'tap';
     startX.current = e.clientX;
     startY.current = e.clientY;
     setDragging(true);
@@ -208,21 +213,33 @@ export function SelfCheckSession({
     if (Math.abs(dx) > Math.abs(dy)) setDragX(dx);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (startX.current === null) return;
+    const dx = e.clientX - startX.current;
     startX.current = null;
     startY.current = null;
     setDragging(false);
-    const dx = Math.abs(dragX) >= SWIPE_THRESHOLD ? dragX : 0;
     setDragX(0);
-    if (dx !== 0) void answer(dx > 0);
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+      dragState.current = 'swipe';
+      void answer(dx > 0);
+    }
+  };
+
+  const onPointerCancel = () => {
+    startX.current = null;
+    startY.current = null;
+    setDragging(false);
+    setDragX(0);
   };
 
   const onCardClick = () => {
-    if (skipClick.current) {
-      skipClick.current = false;
+    if (dragState.current === 'swipe') {
+      // A swipe answered this card; the browser may still emit a click (desktop).
+      dragState.current = 'idle';
       return;
     }
+    if (dragState.current === 'tap') dragState.current = 'idle';
     setFlipped((f) => !f);
   };
 
@@ -252,11 +269,12 @@ export function SelfCheckSession({
       {error && <p className="text-center text-sm text-shu-500">{error}</p>}
 
       <div
-        className="[perspective:1200px]"
+        className="[perspective:1200px] touch-pan-y"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onPointerLeave={onPointerCancel}
       >
         <button
           type="button"
