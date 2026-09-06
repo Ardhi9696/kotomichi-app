@@ -10,6 +10,7 @@ import type { ApplyReviewInput, DueEntry, TagWithVocabInput, VocabRepository } f
 import type {
   ActivityDay,
   AppConfig,
+  DayDetail,
   Deck,
   DirectionThreshold,
   JlptLevel,
@@ -48,6 +49,7 @@ import {
   vocabularyTranslations,
 } from '@/lib/db/schema';
 import { assembleAppConfig, flattenAppConfig } from '@/lib/config/defaults';
+import { computeDayDetail, type DayStatsRow } from '@/lib/stats/overview';
 import type { Direction } from '@/lib/srs/directions';
 import { getDb } from '@/lib/adapters/postgres/db';
 
@@ -816,6 +818,50 @@ export class PostgresVocabRepo implements VocabRepository {
       .from(reviewLog)
       .where(and(eq(reviewLog.userId, userId), sql`${reviewLog.reviewedAt} >= ${since}`));
     return rows[0]?.seconds ?? 0;
+  }
+
+  async getDayDetails(userId: string, days: number): Promise<DayDetail[]> {
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    const dateCol = sql<string>`to_char(${reviewLog.reviewedAt}, 'YYYY-MM-DD')`;
+    const reviewRows = await getDb()
+      .select({
+        date: dateCol,
+        reviews: sql<number>`count(*)::int`,
+        isNewCount: sql<number>`count(*) filter (where ${reviewLog.isNew})::int`,
+        correctCount: sql<number>`count(*) filter (where ${reviewLog.correctness})::int`,
+        seconds: sql<number>`sum(least(${reviewLog.elapsedMs}, 30000))::int / 1000`,
+      })
+      .from(reviewLog)
+      .where(and(eq(reviewLog.userId, userId), sql`${reviewLog.reviewedAt} >= ${since}`))
+      .groupBy(dateCol);
+
+    const quizExpByDate = new Map<string, number>();
+    const quizDateCol = sql<string>`to_char(${quizSessionAnswers.submittedAt}, 'YYYY-MM-DD')`;
+    const quizRows = await getDb()
+      .select({
+        date: quizDateCol,
+        quizExp: sql<number>`sum(${quizSessionAnswers.expGained})::int`,
+      })
+      .from(quizSessionAnswers)
+      .innerJoin(quizSessions, eq(quizSessionAnswers.sessionId, quizSessions.id))
+      .where(and(eq(quizSessions.userId, userId), sql`${quizSessionAnswers.submittedAt} >= ${since}`))
+      .groupBy(quizDateCol);
+    for (const r of quizRows) quizExpByDate.set(r.date.slice(0, 10), r.quizExp ?? 0);
+
+    const config = await this.getAppConfig();
+    return reviewRows.map((r) =>
+      computeDayDetail(
+        {
+          date: r.date.slice(0, 10),
+          seconds: r.seconds ?? 0,
+          reviews: r.reviews ?? 0,
+          isNewCount: r.isNewCount ?? 0,
+          correctCount: r.correctCount ?? 0,
+          quizExp: quizExpByDate.get(r.date.slice(0, 10)) ?? 0,
+        },
+        config.exp,
+      ),
+    );
   }
 
   // ================= quiz sessions =================

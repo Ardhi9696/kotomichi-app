@@ -104,6 +104,11 @@
       "less": "Sedikit",
       "more": "Banyak",
       "cellTooltip": "{date} · {minutes} menit",
+      "tapHint": "Ketuk hari untuk melihat durasi belajar dan EXP yang didapat.",
+      "noActivity": "Tidak ada aktivitas belajar pada hari ini.",
+      "dayMinutes": "{count} mnt",
+      "dayReviews": "{count} ulasan",
+      "dayExp": "+{count} EXP",
       "week": {
         "mon": "Sn",
         "tue": "Sl",

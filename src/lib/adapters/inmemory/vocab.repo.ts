@@ -7,6 +7,7 @@
 import type {
   ActivityDay,
   AppConfig,
+  DayDetail,
   Deck,
   DirectionThreshold,
   JlptLevel,
@@ -33,6 +34,7 @@ import type {
 } from '@/lib/ports/db-port';
 import { DEFAULTS, DEFAULT_THRESHOLDS } from '@/lib/config/defaults';
 import { buildSeedDocs } from '@/lib/adapters/inmemory/seed';
+import { computeDayDetail, type DayStatsRow } from '@/lib/stats/overview';
 
 const key = (userId: string, vocabularyId: number, direction: Direction) =>
   `${userId}:${vocabularyId}:${direction}`;
@@ -520,6 +522,36 @@ export class InMemoryVocabRepo implements VocabRepository {
       total += Math.min(l.elapsedMs, 30000) / 1000;
     }
     return Math.round(total);
+  }
+
+  async getDayDetails(userId: string, days: number): Promise<DayDetail[]> {
+    const since = Date.now() - days * 86400000;
+    const byDay = new Map<string, DayStatsRow>();
+    for (const l of this.logs.get(userId) ?? []) {
+      const ts = new Date(l.reviewedAt).getTime();
+      if (ts < since) continue;
+      const date = l.reviewedAt.slice(0, 10);
+      const cur = byDay.get(date) ?? { date, seconds: 0, reviews: 0, isNewCount: 0, correctCount: 0, quizExp: 0 };
+      cur.reviews += 1;
+      cur.seconds += Math.min(l.elapsedMs, 30000) / 1000;
+      if (l.isNew) cur.isNewCount += 1;
+      if (l.correctness) cur.correctCount += 1;
+      byDay.set(date, cur);
+    }
+    for (const [sessionId, answers] of this.quizSessionAnswers) {
+      const session = this.quizSessions.get(sessionId);
+      if (!session || session.userId !== userId) continue;
+      for (const a of answers) {
+        const ts = new Date(a.submittedAt).getTime();
+        if (ts < since) continue;
+        const date = a.submittedAt.slice(0, 10);
+        const cur = byDay.get(date) ?? { date, seconds: 0, reviews: 0, isNewCount: 0, correctCount: 0, quizExp: 0 };
+        cur.quizExp += a.expGained;
+        byDay.set(date, cur);
+      }
+    }
+    const config = await this.getAppConfig();
+    return [...byDay.values()].map((row) => computeDayDetail(row, config.exp));
   }
 
   // ================= quiz sessions =================

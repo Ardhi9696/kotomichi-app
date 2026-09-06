@@ -8,6 +8,7 @@ import type { Direction } from '@/lib/srs/directions';
 import type {
   ActivityDay,
   AppConfig,
+  DayDetail,
   Deck,
   DirectionThreshold,
   JlptLevel,
@@ -170,6 +171,8 @@ export interface VocabRepository {
   getActivity(userId: string, days: number): Promise<ActivityDay[]>;
   getRecentLogs(userId: string, limit?: number): Promise<ReviewLog[]>;
   getStudySeconds(userId: string, sinceDays: number): Promise<number>;
+  /** Per-day aggregates (reviews, study seconds, EXP from reviews & quizzes) for the overview detail panel. */
+  getDayDetails(userId: string, days: number): Promise<DayDetail[]>;
 
   // ---------- quiz sessions ----------
   createQuizSession(userId: string, deckId: number, mode: QuizMode, totalSessions: number, sessionIndex?: number): Promise<QuizSession>;

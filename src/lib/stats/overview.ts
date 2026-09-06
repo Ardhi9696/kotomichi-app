@@ -1,4 +1,5 @@
-import type { ActivityDay } from '@/lib/domain';
+import type { ActivityDay, DayDetail } from '@/lib/domain';
+import type { ExpConfig } from '@/lib/game/gamification';
 
 export interface DayStat {
   /** YYYY-MM-DD */
@@ -114,4 +115,33 @@ export function heatLevel(minutes: number): 0 | 1 | 2 | 3 {
   if (minutes >= 15) return 2;
   if (minutes >= 5) return 1;
   return 0;
+}
+
+/** Raw per-day aggregate as produced by the data adapters (DB-aware). */
+export interface DayStatsRow {
+  /** YYYY-MM-DD */
+  date: string;
+  /** total review seconds on that day (elapsed clamped to 30s per review) */
+  seconds: number;
+  reviews: number;
+  isNewCount: number;
+  correctCount: number;
+  /** EXP earned from quiz answers that day */
+  quizExp: number;
+}
+
+/**
+ * Turn a raw daily aggregate into the EXP breakdown shown in the calendar
+ * detail panel. Review EXP follows the same rules as live submissions:
+ * `newCard` per new-direction card + `reviewSuccess` per correct review,
+ * plus any EXP banked from quiz answers. Pure — no I/O.
+ */
+export function computeDayDetail(row: DayStatsRow, exp: ExpConfig): DayDetail {
+  const reviewExp = row.isNewCount * exp.newCard + row.correctCount * exp.reviewSuccess;
+  return {
+    date: row.date,
+    minutes: Math.max(0, Math.round(row.seconds / 60)),
+    reviews: row.reviews,
+    exp: reviewExp + row.quizExp,
+  };
 }

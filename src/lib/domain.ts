@@ -236,6 +236,15 @@ export interface ActivityDay {
   seconds: number;
 }
 
+/** Per-day study detail for the dashboard calendar (server-computed). */
+export interface DayDetail {
+  /** YYYY-MM-DD */
+  date: string;
+  minutes: number;
+  reviews: number;
+  exp: number;
+}
+
 /** Result of submitting a single quiz answer (learn § quiz). */
 export type QuizAnswerResult = {
   correct: boolean;

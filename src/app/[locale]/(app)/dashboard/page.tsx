@@ -8,7 +8,7 @@ import { levelFromExp } from '@/lib/game/gamification';
 import { ActivityLabel } from '@/components/activity-label';
 import { OverviewCalendar } from '@/components/overview-calendar';
 import { computeOverview } from '@/lib/stats/overview';
-import type { Role } from '@/lib/domain';
+import type { DayDetail, Role } from '@/lib/domain';
 
 export const metadata: Metadata = { title: 'Dashboard — Kotomichi' };
 
@@ -98,8 +98,17 @@ async function OverviewSection() {
   const to = await getTranslations('dashboard.overview');
   const { user, repo } = await getStudyContext();
 
-  const activity = await repo.getActivity(user.id, OVERVIEW_WINDOW_DAYS);
+  const today = new Date().toISOString().slice(0, 10);
+  const [activity, details] = await Promise.all([
+    repo.getActivity(user.id, OVERVIEW_WINDOW_DAYS),
+    repo.getDayDetails(user.id, OVERVIEW_WINDOW_DAYS),
+  ]);
   const overview = computeOverview(activity, new Date(), OVERVIEW_WINDOW_DAYS);
+
+  const dayDetails: Record<string, DayDetail> = {};
+  for (const d of details) {
+    if (d.date <= today) dayDetails[d.date] = d;
+  }
 
   return (
     <section className="card p-6">
@@ -115,7 +124,7 @@ async function OverviewSection() {
           <Metric value={String(overview.totalMinutes)} label={to('totalMinutes')} />
         </div>
       </div>
-      <OverviewCalendar monthCells={overview.monthCells} monthYear={overview.monthYear} />
+      <OverviewCalendar monthCells={overview.monthCells} monthYear={overview.monthYear} dayDetails={dayDetails} />
     </section>
   );
 }

@@ -104,6 +104,11 @@
       "less": "Less",
       "more": "More",
       "cellTooltip": "{date} · {minutes} min",
+      "tapHint": "Tap a day to see how long you studied and the EXP you gained.",
+      "noActivity": "No study recorded on this day.",
+      "dayMinutes": "{count} min",
+      "dayReviews": "{count} reviews",
+      "dayExp": "+{count} EXP",
       "week": {
         "mon": "Mo",
         "tue": "Tu",

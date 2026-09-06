@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { computeOverview } from './overview';
+import { computeDayDetail, computeOverview, type DayStatsRow } from './overview';
 import type { ActivityDay } from '@/lib/domain';
+import { DEFAULT_EXP_CONFIG } from '@/lib/game/gamification';
 
 function day(key: string, seconds: number, reviews = 1): ActivityDay {
   return { date: key, seconds, reviews };
+}
+
+function row(partial: Partial<DayStatsRow>): DayStatsRow {
+  return { date: '2026-09-05', seconds: 0, reviews: 0, isNewCount: 0, correctCount: 0, quizExp: 0, ...partial };
 }
 
 describe('computeOverview', () => {
@@ -56,5 +61,24 @@ describe('computeOverview', () => {
     const s = computeOverview([], now, 30);
     const futureCells = s.monthCells.filter((c) => c !== null && c.isFuture);
     expect(futureCells.length).toBe(25); // Sep 6-30
+  });
+});
+
+describe('computeDayDetail', () => {
+  it('awarded newCard + reviewSuccess EXP for reviews and quiz EXP', () => {
+    const exp = DEFAULT_EXP_CONFIG;
+    const d = computeDayDetail(row({ isNewCount: 2, correctCount: 5, quizExp: 14 }), exp);
+    expect(d.exp).toBe(2 * exp.newCard + 5 * exp.reviewSuccess + 14);
+  });
+
+  it('wrong reviews earn no review EXP', () => {
+    const exp = DEFAULT_EXP_CONFIG;
+    const d = computeDayDetail(row({ isNewCount: 1, correctCount: 0, reviews: 3 }), exp);
+    expect(d.exp).toBe(exp.newCard);
+  });
+
+  it('minutes round study seconds to whole minutes', () => {
+    const d = computeDayDetail(row({ seconds: 350, reviews: 1 }), DEFAULT_EXP_CONFIG);
+    expect(d.minutes).toBe(6);
   });
 });
