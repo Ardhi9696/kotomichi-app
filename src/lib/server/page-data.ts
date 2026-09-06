@@ -4,7 +4,11 @@ import { requireLearner, getStudyContext } from '@/lib/server/dal';
 import { buildStudyCard } from '@/lib/srs/study-card';
 import { DIRECTIONS } from '@/lib/srs/directions';
 import { pickMeaning } from '@/lib/srs/meaning';
-import type { LearnPageData, ReviewPageData } from '@/lib/page-data/types';
+import { buildQuizSession, type QuizMode } from '@/lib/srs/quiz';
+import type { LearnPageData, QuizPageData, ReviewPageData } from '@/lib/page-data/types';
+
+/** Words (and therefore questions) served per quiz session. */
+const WORDS_PER_SESSION = 5;
 
 /**
  * Reads for the study pages. Used by both the SSR page (initial render) and
@@ -70,5 +74,39 @@ export async function loadLearnPageData(deckId: number): Promise<LearnPageData |
       };
     }),
     cards,
+  };
+}
+
+export async function loadQuizPageData(
+  deckId: number,
+  mode: QuizMode,
+  sessionIndex: number,
+): Promise<QuizPageData | null> {
+  await requireLearner();
+  const { user, profile, repo, service } = await getStudyContext();
+  const now = new Date().toISOString();
+  const locale = profile.preferredLocale;
+
+  const states = await service.decksWithProgress(user.id, locale, now);
+  const active = states.find((s) => s.deck.id === deckId && !s.deck.isLocked);
+  if (!active) return null;
+
+  const words = await repo.getDeckWords(active.deck.id);
+  const totalSessions = Math.max(1, Math.ceil(words.length / WORDS_PER_SESSION));
+  const clamped = Math.max(0, Math.min(sessionIndex, totalSessions - 1));
+
+  const session = await repo.createQuizSession(user.id, active.deck.id, mode, totalSessions, clamped);
+  const sessionWords = words.slice(clamped * WORDS_PER_SESSION, (clamped + 1) * WORDS_PER_SESSION);
+  const questions = buildQuizSession(sessionWords, locale, mode);
+
+  return {
+    deckId: active.deck.id,
+    deckTitle: active.deck.title,
+    mode,
+    sessionIndex: clamped,
+    totalSessions,
+    wordCount: words.length,
+    sessionId: session.id,
+    questions,
   };
 }

@@ -1,4 +1,5 @@
 import type { PartOfSpeech, StudyCard } from '@/lib/domain';
+import type { QuizMode, QuizQuestion } from '@/lib/srs/quiz';
 
 /** Snapshot rendered by the /review page and revalidated by SWR. */
 export interface ReviewPageData {
@@ -32,4 +33,17 @@ export interface LearnPageData {
   wordCount: number;
   words: LearnWordRow[];
   cards: StudyCard[];
+}
+
+export interface QuizPageData {
+  deckId: number;
+  deckTitle: string;
+  mode: QuizMode;
+  /** 0-based session index, clamped to a valid range by the loader. */
+  sessionIndex: number;
+  totalSessions: number;
+  /** total words in the deck (for the progress header) */
+  wordCount: number;
+  sessionId: number;
+  questions: QuizQuestion[];
 }
