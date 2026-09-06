@@ -43,19 +43,20 @@ export default async function DashboardPage() {
       <section>
         <h2 className="mb-3 font-serif text-xl font-bold text-ink-800 dark:text-ink-100">{t('menu')}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <MenuCard href="/learn" title={t('menuLearn')} description={t('menuLearnDescription')} icon="学" />
+          <MenuCard href="/learn" title={t('menuLearn')} description={t('menuLearnDescription')} icon="学" prefetch />
           <MenuCard
             href="/review"
             title={t('menuReview')}
             description={t('menuReviewDescription')}
             icon="復"
+            prefetch
             badge={
               <Suspense fallback={null}>
                 <ReviewBadge userId={user.id} newDailyCap={config.srs.dailyNewCap} />
               </Suspense>
             }
           />
-          <MenuCard href="/words" title={t('menuSearch')} description={t('menuSearchDescription')} icon="索" />
+          <MenuCard href="/words" title={t('menuSearch')} description={t('menuSearchDescription')} icon="索" prefetch />
         </div>
       </section>
 
@@ -127,7 +128,7 @@ async function DueStrip() {
   if (dueCount <= 0) return null;
 
   return (
-    <Link href="/review" className="card group flex items-center justify-between px-5 py-4 transition-colors hover:border-kintsugi-500/50">
+    <Link href="/review" prefetch className="card group flex items-center justify-between px-5 py-4 transition-colors hover:border-kintsugi-500/50">
       <span className="text-sm text-ink-700 dark:text-ink-200">
         {t('dueStrip', { count: dueCount })}
       </span>
@@ -209,16 +210,19 @@ function MenuCard({
   description,
   icon,
   badge,
+  prefetch: shouldPrefetch,
 }: {
   href: string;
   title: string;
   description: string;
   icon: string;
   badge?: React.ReactNode;
+  prefetch?: boolean;
 }) {
   return (
     <Link
       href={href}
+      prefetch={shouldPrefetch}
       className="card group flex flex-col items-start gap-3 p-5 transition-transform hover:-translate-y-0.5"
     >
       <div className="flex w-full items-center justify-between">
