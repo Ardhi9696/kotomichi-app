@@ -13,7 +13,6 @@ import type { QuizPageData } from '@/lib/page-data/types';
 
 export function QuizShell() {
   const t = useTranslations('learn');
-  const tq = useTranslations('quiz');
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -65,7 +64,6 @@ export function QuizShell() {
   }
 
   const { deckId: aid, deckTitle, sessionIndex: idx, totalSessions, wordCount } = data;
-  const overallProgress = totalSessions > 0 ? ((idx + 1) / totalSessions) * 100 : 0;
 
   if (data.questions.length === 0) {
     return (
@@ -79,42 +77,17 @@ export function QuizShell() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Overall Deck Progress Bar */}
-      <div className="card p-4">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-semibold uppercase tracking-wider text-ink-400">
-            {tq('deckProgress')} {idx + 1} / {totalSessions} {tq('sessions')}
-          </span>
-          <span className="text-ink-500 dark:text-ink-400">
-            {tq('wordsTotal', { current: (idx + 1) * WORDS_PER_SESSION, total: wordCount })}
-          </span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500 transition-all"
-            style={{ width: `${overallProgress}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="text-center">
-        <h1 className="font-serif text-3xl font-bold text-ink-900 dark:text-washi-50">{t('quizTitle')}</h1>
-        <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">
-          {tq(data.mode === 'hard' ? 'modeHardDescription' : 'modeNormalDescription')}
-        </p>
-      </div>
-      <QuizSession
-        key={data.sessionId}
-        questions={data.questions}
-        deckId={aid}
-        deckTitle={deckTitle}
-        mode={data.mode}
-        sessionIndex={idx}
-        totalSessions={totalSessions}
-        sessionId={data.sessionId}
-      />
-    </div>
+    <QuizSession
+      key={data.sessionId}
+      questions={data.questions}
+      deckId={aid}
+      deckTitle={deckTitle}
+      mode={data.mode}
+      sessionIndex={idx}
+      totalSessions={totalSessions}
+      sessionId={data.sessionId}
+      totalWords={wordCount}
+    />
   );
 }
 
@@ -141,5 +114,3 @@ function QuizPageSkeleton() {
     </>
   );
 }
-
-const WORDS_PER_SESSION = 5;

@@ -55,6 +55,7 @@ export function QuizSession({
   sessionIndex = 0,
   totalSessions = 1,
   sessionId,
+  totalWords = 0,
 }: {
   questions: QuizQuestion[];
   deckId: number;
@@ -63,6 +64,7 @@ export function QuizSession({
   sessionIndex?: number;
   totalSessions?: number;
   sessionId?: number;
+  totalWords?: number;
 }) {
   const t = useTranslations('quiz');
   const common = useTranslations('common');
@@ -344,45 +346,53 @@ export function QuizSession({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      {/* Question Progress */}
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-semibold uppercase tracking-wider text-ink-400">{deckTitle}</span>
-        <span className="text-ink-500 dark:text-ink-400">
-          {tLearn('quiz')} · {Math.min(index + 1, total)} / {total}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2 text-xs">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500 transition-all"
-            style={{ width: `${Math.round((index / total) * 100)}%` }}
-          />
+      {/* Compact header: deck · mode · session/words, then question progress + direction */}
+      <div className="card flex flex-col gap-2 p-4">
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="truncate font-semibold uppercase tracking-wider text-ink-400">{deckTitle}</span>
+          <span className="flex shrink-0 items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
+            <span className="whitespace-nowrap tabular-nums">
+              {sessionIndex + 1}/{totalSessions} · {totalWords > 0 ? t('wordsInSession', { count: totalWords }) : ''}
+            </span>
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              mode === 'hard'
+                ? 'bg-kintsugi-500/10 text-kintsugi-600 dark:text-kintsugi-300'
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+            }`}>
+              {t(mode === 'hard' ? 'modeHard' : 'modeNormal')}
+            </span>
+            {submitting && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                {t('syncing')}
+              </span>
+            )}
+          </span>
         </div>
-        <span className="w-10 text-right text-ink-500 dark:text-ink-400">{Math.round((index / total) * 100)}%</span>
+
+        <div className="flex items-center gap-2 text-xs">
+          <span className="shrink-0 tabular-nums text-ink-500 dark:text-ink-400">
+            {Math.min(index + 1, total)}/{total}
+          </span>
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-shu-500 to-kintsugi-500 transition-all"
+              style={{ width: `${Math.round((index / total) * 100)}%` }}
+            />
+          </div>
+          <span className="w-10 shrink-0 text-right tabular-nums text-ink-500 dark:text-ink-400">
+            {Math.round((index / total) * 100)}%
+          </span>
+        </div>
       </div>
 
-      {/* Direction badge */}
+      {/* Direction + prompt */}
       <div className="flex items-center justify-center gap-2">
         <span className="rounded-full bg-shu-500/10 px-3 py-1 text-xs font-semibold text-shu-600 dark:text-shu-300">
           {question.directionLabel.source} → {question.directionLabel.target}
         </span>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-          mode === 'hard'
-            ? 'bg-kintsugi-500/10 text-kintsugi-600 dark:text-kintsugi-300'
-            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-        }`}>
-          {t(mode === 'hard' ? 'modeHard' : 'modeNormal')}
-        </span>
-        {submitting && (
-          <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            {t('syncing')}
-          </span>
-        )}
+        <span className="text-xs font-medium text-ink-500 dark:text-ink-400">{t('pickAnswer')}</span>
       </div>
-
-      <p className="text-center text-sm font-semibold tracking-wide text-ink-500 dark:text-ink-400">{t('pickAnswer')}</p>
 
       {/* Front word */}
       <div className="card flex min-h-40 flex-col items-center justify-center gap-2 p-8 text-center">
