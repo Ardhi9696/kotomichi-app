@@ -7,9 +7,32 @@ import { FlashcardSession } from '@/components/flashcard-session';
 import { usePageData } from '@/lib/client/use-page-data';
 import type { ReviewPageData } from '@/lib/page-data/types';
 
-export function ReviewShell({ initial }: { initial: ReviewPageData }) {
+export function ReviewShell() {
   const t = useTranslations('review');
-  const { data = initial } = usePageData<ReviewPageData>('review-data', fetchReviewPageData, initial);
+  const { data, isLoading } = usePageData<ReviewPageData | null>('review-data', fetchReviewPageData, null, {
+    revalidateOnMount: true,
+  });
+
+  if (!data && isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="mx-auto text-center">
+          <div className="h-8 w-40 animate-pulse rounded-lg bg-ink-200/70 dark:bg-ink-800" />
+          <div className="mt-2 h-4 w-64 animate-pulse rounded bg-ink-200/50 dark:bg-ink-800/60" />
+        </div>
+        <div className="card mx-auto flex h-72 w-full max-w-2xl animate-pulse items-center justify-center">
+          <div className="h-10 w-40 rounded bg-ink-200/70 dark:bg-ink-800" />
+        </div>
+        <div className="mx-auto flex items-center justify-center gap-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-12 w-36 animate-pulse rounded-xl bg-ink-200/50 dark:bg-ink-800/60" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <div className="flex flex-col gap-6">

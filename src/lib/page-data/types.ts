@@ -1,4 +1,4 @@
-import type { PartOfSpeech, StudyCard } from '@/lib/domain';
+import type { ActivityDay, DayDetail, PartOfSpeech, StudyCard } from '@/lib/domain';
 import type { QuizMode, QuizQuestion } from '@/lib/srs/quiz';
 
 /** Snapshot rendered by the /review page and revalidated by SWR. */
@@ -17,6 +17,38 @@ export interface LearnWordRow {
   partOfSpeech: PartOfSpeech | null;
   example: string | null;
   exampleMeaning: string | null;
+}
+
+/** One row in the /words search results (shared with the learn list view). */
+export type SearchWordRow = LearnWordRow;
+
+/** Snapshot rendered by the /words page and revalidated by SWR. */
+export interface WordsPageData {
+  query: string;
+  rows: SearchWordRow[];
+}
+
+export interface DashboardLogRow {
+  id: number;
+  direction: number;
+  correctness: boolean;
+  reviewedAt: string;
+}
+
+/** Learner dashboard snapshot rendered by /dashboard and revalidated by SWR. */
+export interface DashboardPageData {
+  displayName: string;
+  level: number;
+  exp: number;
+  currentStreak: number;
+  dueCount: number;
+  /** reviews introduced since midnight (used for the daily new-card cap) */
+  newToday: number;
+  newDailyCap: number;
+  studySeconds: number;
+  recentLogs: DashboardLogRow[];
+  activity: ActivityDay[];
+  dayDetails: DayDetail[];
 }
 
 export interface LearnDeckOption {

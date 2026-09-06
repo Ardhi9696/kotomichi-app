@@ -1,75 +1,83 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTransition } from 'react';
 
+import { fetchWordsPageData } from '@/app/actions/page-data';
 import { posLabel } from '@/lib/srs/pos-label';
-import type { PartOfSpeech } from '@/lib/domain';
+import { usePageData } from '@/lib/client/use-page-data';
+import type { SearchWordRow, WordsPageData } from '@/lib/page-data/types';
 
-export interface SearchWordRow {
-  id: number;
-  main: string;
-  hiragana: string;
-  romaji: string | null;
-  meaning: string;
-  partOfSpeech: PartOfSpeech | null;
-  example: string | null;
-  exampleMeaning: string | null;
-}
+export type { SearchWordRow };
 
-export function VocabularySearch({ initialWords }: { initialWords: SearchWordRow[] }) {
+export function VocabularySearch() {
   const t = useTranslations('vocab');
   const tLearn = useTranslations('learn');
   const common = useTranslations('common');
-
-  const [query, setQuery] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return initialWords;
-    return initialWords.filter((w) =>
-      [w.main, w.hiragana, w.romaji, w.meaning].filter(Boolean).join(' ').toLowerCase().includes(q),
-    );
-  }, [query, initialWords]);
+  // Mirror the URL query into a fast local input; the SWR key follows it.
+  const initialQuery = searchParams.get('q') ?? '';
+  const [query, setQuery] = useState(initialQuery);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data } = usePageData<WordsPageData | null>(
+    `words-data:${query}`,
+    () => fetchWordsPageData(query),
+    null,
+    { revalidateOnMount: true },
+  );
+
+  const rows: SearchWordRow[] = data?.rows ?? [];
+  const searching = query.trim().length > 0;
 
   return (
     <div className="flex flex-col gap-4">
-      <form
-        role="search"
-        onSubmit={(e) => e.preventDefault()}
-        className="flex items-center gap-2"
-      >
+      <form role="search" onSubmit={(e) => e.preventDefault()} className="flex items-center gap-2">
         <input
           type="search"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
-            startTransition(() => router.replace(`/words?q=${encodeURIComponent(e.target.value)}`, { scroll: false }));
+            const next = e.target.value;
+            setQuery(next);
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(() => {
+              startTransition(() =>
+                router.replace(`/words?q=${encodeURIComponent(next)}`, { scroll: false }),
+              );
+            }, 300);
           }}
           placeholder={t('searchPlaceholder')}
           className="w-full rounded-full border border-ink-200 bg-washi-50 px-5 py-2.5 text-sm text-ink-800 outline-none transition-colors placeholder:text-ink-400 focus:border-kintsugi-500 dark:border-ink-700 dark:bg-ink-900 dark:text-washi-50"
           aria-label={t('searchPlaceholder')}
         />
-        {pending && <span className="text-xs text-ink-400">{common('loading')}</span>}
+        {(pending || !data) && <span className="text-xs text-ink-400">{common('loading')}</span>}
       </form>
 
       <p className="text-xs text-ink-400">
-        {t('results', { count: filtered.length })}
+        {t('results', { count: rows.length })}
       </p>
 
-      {filtered.length === 0 ? (
+      {!data ? (
+        <WordListSkeleton />
+      ) : rows.length === 0 && searching ? (
         <div className="card p-10 text-center">
           <p className="font-serif text-xl text-ink-800 dark:text-washi-50">{t('noResults')}</p>
           <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{t('noResultsHint')}</p>
         </div>
+      ) : rows.length === 0 ? (
+        <div className="card p-10 text-center">
+          <p className="font-serif text-xl text-ink-800 dark:text-washi-50">{t('empty')}</p>
+        </div>
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {filtered.map((w) => (
+          {rows.map((w) => (
             <li
               key={w.id}
               className="flex flex-col gap-1 rounded-xl border border-ink-200/60 bg-washi-50/60 p-3 transition-colors dark:border-ink-800 dark:bg-ink-900/40"
@@ -103,6 +111,20 @@ export function VocabularySearch({ initialWords }: { initialWords: SearchWordRow
           {t('goToLearn')} →
         </Link>
       </p>
+    </div>
+  );
+}
+
+function WordListSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-hidden>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex flex-col gap-1 rounded-xl border border-ink-200/60 p-3 dark:border-ink-800">
+          <div className="h-4 w-1/2 animate-pulse rounded bg-ink-200/70 dark:bg-ink-800" />
+          <div className="h-3 w-2/3 animate-pulse rounded bg-ink-200/50 dark:bg-ink-800/60" />
+          <div className="h-3 w-3/4 animate-pulse rounded bg-ink-200/40 dark:bg-ink-800/50" />
+        </div>
+      ))}
     </div>
   );
 }

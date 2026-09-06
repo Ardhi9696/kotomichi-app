@@ -4,6 +4,7 @@ import { AppHeader } from '@/components/app-header';
 import { ActivityHeartbeat } from '@/components/activity-heartbeat';
 import { FlashProvider } from '@/components/flash-provider';
 import { ProfileSync } from '@/components/profile-sync';
+import { StudyDataWarmup } from '@/components/study-data-warmup';
 import { getCurrentUser } from '@/lib/server/dal';
 import type { ThemeMode } from '@/lib/domain';
 
@@ -37,6 +38,7 @@ async function AppChrome() {
   return (
     <>
       {current && <ActivityHeartbeat />}
+      {current && !isAdmin && <StudyDataWarmup />}
       {profile && <ProfileSync theme={profile.theme} preferredLocale={profile.preferredLocale} />}
       <AppHeader signedIn={Boolean(current)} isAdmin={isAdmin} profile={profile} />
     </>

@@ -1,41 +1,15 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { getTranslations } from 'next-intl/server';
 
-import { requireLearner, getStudyContext } from '@/lib/server/dal';
-import { VocabularySearch, type SearchWordRow } from '@/components/vocabulary-search';
-import { pickMeaning } from '@/lib/srs/meaning';
+import { requireLearner } from '@/lib/server/dal';
+import { VocabularySearch } from '@/components/vocabulary-search';
 
 export const metadata: Metadata = { title: 'Vocabulary — Kotomichi' };
 
-const SEARCH_LIMIT = 60;
-
-export default async function WordsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
+export default async function WordsPage() {
   await requireLearner();
   const t = await getTranslations('vocab');
-  const { q } = await searchParams;
-  const query = q ?? '';
-
-  const { profile, repo } = await getStudyContext();
-  const locale = profile.preferredLocale;
-
-  const words = await repo.searchVocabulary(query, { limit: SEARCH_LIMIT });
-  const rows: SearchWordRow[] = words.map((w) => {
-    const ex = w.examples[0];
-    return {
-      id: w.vocabulary.id,
-      main: w.vocabulary.kanji ?? w.vocabulary.hiragana,
-      hiragana: w.vocabulary.hiragana,
-      romaji: w.vocabulary.romaji ?? null,
-      meaning: pickMeaning(w, locale),
-      partOfSpeech: w.vocabulary.partOfSpeech ?? null,
-      example: ex?.japanese ?? null,
-      exampleMeaning: ex?.translations.find((t) => t.locale === locale)?.translation ?? ex?.translations[0]?.translation ?? null,
-    };
-  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -44,7 +18,9 @@ export default async function WordsPage({
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
       </div>
 
-      <VocabularySearch initialWords={rows} />
+      <Suspense>
+        <VocabularySearch />
+      </Suspense>
     </div>
   );
 }

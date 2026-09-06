@@ -5,10 +5,23 @@ import { buildStudyCard } from '@/lib/srs/study-card';
 import { DIRECTIONS } from '@/lib/srs/directions';
 import { pickMeaning } from '@/lib/srs/meaning';
 import { buildQuizSession, type QuizMode } from '@/lib/srs/quiz';
-import type { LearnPageData, QuizPageData, ReviewPageData } from '@/lib/page-data/types';
+import { levelFromExp } from '@/lib/game/gamification';
+import type {
+  DashboardPageData,
+  LearnPageData,
+  QuizPageData,
+  ReviewPageData,
+  WordsPageData,
+} from '@/lib/page-data/types';
 
 /** Words (and therefore questions) served per quiz session. */
 const WORDS_PER_SESSION = 5;
+
+/** Dashboard calendar look-back window, in days. */
+const OVERVIEW_WINDOW_DAYS = 30;
+
+/** Upper bound for /words search results. */
+const SEARCH_LIMIT = 60;
 
 /**
  * Reads for the study pages. Used by both the SSR page (initial render) and
@@ -108,5 +121,67 @@ export async function loadQuizPageData(
     wordCount: words.length,
     sessionId: session.id,
     questions,
+  };
+}
+
+export async function loadWordsPageData(query: string): Promise<WordsPageData> {
+  await requireLearner();
+  const { profile, repo } = await getStudyContext();
+  const locale = profile.preferredLocale;
+
+  const words = await repo.searchVocabulary(query, { limit: SEARCH_LIMIT });
+  const rows = words.map((w) => {
+    const ex = w.examples[0];
+    return {
+      id: w.vocabulary.id,
+      main: w.vocabulary.kanji ?? w.vocabulary.hiragana,
+      hiragana: w.vocabulary.hiragana,
+      romaji: w.vocabulary.romaji ?? null,
+      meaning: pickMeaning(w, locale),
+      partOfSpeech: w.vocabulary.partOfSpeech ?? null,
+      example: ex?.japanese ?? null,
+      exampleMeaning:
+        ex?.translations.find((t) => t.locale === locale)?.translation ?? ex?.translations[0]?.translation ?? null,
+    };
+  });
+
+  return { query, rows };
+}
+
+/** Learner dashboard snapshot (all reads run in parallel). */
+export async function loadDashboardPageData(): Promise<DashboardPageData> {
+  await requireLearner();
+  const { user, profile, repo, config } = await getStudyContext();
+
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const midnight = `${today}T00:00:00.000Z`;
+
+  const [dueCount, newToday, activity, dayDetails, studySeconds, recentLogs] = await Promise.all([
+    repo.countDue(user.id, now.toISOString()),
+    repo.countNewReviews(user.id, midnight),
+    repo.getActivity(user.id, OVERVIEW_WINDOW_DAYS),
+    repo.getDayDetails(user.id, OVERVIEW_WINDOW_DAYS),
+    repo.getStudySeconds(user.id, 1),
+    repo.getRecentLogs(user.id, 8),
+  ]);
+
+  return {
+    displayName: profile.displayName,
+    level: levelFromExp(profile.exp, config.exp.base).level,
+    exp: profile.exp,
+    currentStreak: profile.currentStreak,
+    dueCount,
+    newToday,
+    newDailyCap: config.srs.dailyNewCap,
+    studySeconds,
+    recentLogs: recentLogs.map((l) => ({
+      id: l.id,
+      direction: l.direction,
+      correctness: l.correctness,
+      reviewedAt: l.reviewedAt,
+    })),
+    activity,
+    dayDetails: dayDetails.filter((d) => d.date <= today),
   };
 }

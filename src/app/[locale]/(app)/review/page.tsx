@@ -1,11 +1,17 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { loadReviewPageData } from '@/lib/server/page-data';
+import { requireLearner } from '@/lib/server/dal';
 import { ReviewShell } from '@/components/review-shell';
 
 export const metadata: Metadata = { title: 'Review — Kotomichi' };
 
 export default async function ReviewPage() {
-  const data = await loadReviewPageData();
-  return <ReviewShell initial={data} />;
+  await requireLearner();
+
+  return (
+    <Suspense>
+      <ReviewShell />
+    </Suspense>
+  );
 }
