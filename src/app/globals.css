@@ -24,11 +24,16 @@
   --color-ink-100: #ededE8;
 
   --color-shu-500: #8f3a36;
+  --color-shu-600: #752a26;
+  --color-shu-700: #63201d;
   --color-shu-400: #b04a3f;
   --color-shu-300: #cf6152;
   --color-shu-100: #f3dcd5;
 
+  --color-kintsugi-600: #9a7e1b;
   --color-kintsugi-500: #c9a227;
+  --color-kintsugi-400: #d9b937;
+  --color-kintsugi-300: #ead78a;
   --color-kintsugi-100: #f4e8c3;
 
   --font-serif: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', Georgia, serif;
