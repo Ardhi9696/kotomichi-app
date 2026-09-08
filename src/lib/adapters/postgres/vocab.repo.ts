@@ -482,13 +482,15 @@ export class PostgresVocabRepo implements VocabRepository {
     const rows = Object.keys(set).length > 0
       ? await db.update(vocabulary).set(set).where(eq(vocabulary.id, id)).returning()
       : await db.select().from(vocabulary).where(eq(vocabulary.id, id)).limit(1);
-    if (patch.translations) {
+    if (patch.translations && patch.translations.length > 0) {
       await db.delete(vocabularyTranslations).where(eq(vocabularyTranslations.vocabularyId, id));
       await db.insert(vocabularyTranslations).values(
         patch.translations.map((t) => ({ vocabularyId: id, locale: t.locale, meaning: t.meaning })),
       );
+    } else if (patch.translations !== undefined) {
+      await db.delete(vocabularyTranslations).where(eq(vocabularyTranslations.vocabularyId, id));
     }
-    if (patch.examples) {
+    if (patch.examples && patch.examples.length > 0) {
       await db.delete(exampleSentences).where(eq(exampleSentences.vocabularyId, id));
       for (const ex of patch.examples) {
         const exRow = await db
@@ -501,12 +503,16 @@ export class PostgresVocabRepo implements VocabRepository {
           );
         }
       }
+    } else if (patch.examples !== undefined) {
+      await db.delete(exampleSentences).where(eq(exampleSentences.vocabularyId, id));
     }
-    if (patch.collocations) {
+    if (patch.collocations && patch.collocations.length > 0) {
       await db.delete(verbCollocations).where(eq(verbCollocations.vocabularyId, id));
       await db.insert(verbCollocations).values(
         patch.collocations.map((c) => ({ vocabularyId: id, collocation: c.collocation, meaning: c.meaning ?? null })),
       );
+    } else if (patch.collocations !== undefined) {
+      await db.delete(verbCollocations).where(eq(verbCollocations.vocabularyId, id));
     }
     return rows[0]
       ? {
