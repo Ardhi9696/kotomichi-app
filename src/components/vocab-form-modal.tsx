@@ -120,14 +120,25 @@ export function VocabFormModal({
       aria-modal="true"
       aria-label={editing ? 'Edit vocabulary' : 'New vocabulary'}
     >
-      <div className="absolute inset-0 bg-ink-950/60" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-ink-950/60"
+        onClick={() => { if (!pending) onClose(); }}
+      />
       <div className="relative max-h-[90dvh] w-full max-w-2xl overflow-hidden rounded-2xl border border-ink-200 bg-washi-50 shadow-card animate-modal-in dark:border-ink-800 dark:bg-ink-900">
         <form action={submit} className="flex max-h-[90dvh] flex-col">
           <div className="flex items-center justify-between border-b border-ink-200 px-6 py-4 dark:border-ink-800">
             <h2 className="font-serif text-lg font-bold text-ink-900 dark:text-washi-50">
               {editing ? 'Edit vocabulary' : 'New vocabulary'}
             </h2>
-            <button type="button" className="btn-ghost" onClick={onClose}>✕</button>
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={pending}
+              onClick={onClose}
+              aria-label="Close"
+            >
+              ✕
+            </button>
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
@@ -390,15 +401,32 @@ export function VocabFormModal({
           </div>
 
           <div className="flex justify-end gap-2 border-t border-ink-200 px-6 py-4 dark:border-ink-800">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button 
-              type="submit" 
-              className="btn-primary" 
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={pending}>Cancel</button>
+            <button
+              type="submit"
+              className="btn-primary inline-flex items-center gap-2"
               disabled={pending || (editing && !hasChanges)}
             >
+              {pending && (
+                <span
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-washi-50/40 border-t-washi-50"
+                  aria-hidden="true"
+                />
+              )}
               {pending ? 'Saving...' : editing ? 'Save' : 'Add vocabulary'}
             </button>
           </div>
+
+          {pending && (
+            <div
+              className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-washi-50/80 backdrop-blur-[2px] dark:bg-ink-900/80"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="h-8 w-8 animate-spin rounded-full border-2 border-ink-200 border-t-shu-500 dark:border-ink-700 dark:border-t-shu-400" />
+              <span className="text-sm font-medium text-ink-600 dark:text-ink-200">Saving…</span>
+            </div>
+          )}
         </form>
       </div>
     </div>,
