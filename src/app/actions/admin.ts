@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { requireRole } from '@/lib/server/dal';
 import { getAuthProvider, getRepository } from '@/lib/server/runtime';
+import { buildBulkRow, isValidRow } from '@/lib/bulk-import';
 import type { JlptLevel, PartOfSpeech, Role, UserProfile } from '@/lib/domain';
 import type { TagWithVocabInput } from '@/lib/ports/db-port';
 
@@ -100,6 +101,7 @@ export async function createVocabularyAction(formData: FormData): Promise<void> 
 
   const romaji = String(formData.get('romaji') ?? '').trim() || null;
   const kanji = String(formData.get('kanji') ?? '').trim() || null;
+  const furigana = String(formData.get('furigana') ?? '').trim() || null;
   const partOfSpeech = partOfSpeechValue(formData.get('partOfSpeech') as string | null);
   const translations = parseTranslations(formData);
 
@@ -113,7 +115,7 @@ export async function createVocabularyAction(formData: FormData): Promise<void> 
     .filter((n) => Number.isFinite(n) && n > 0);
 
   const created = await repo.createVocabulary(
-    { kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
+    { kanji, hiragana, romaji, furigana, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
       ...grammarFlagsAll(formData), translations, examples, collocations },
     null,
   );
@@ -133,6 +135,7 @@ export async function upsertVocabularyAction(formData: FormData): Promise<void> 
 
   const romaji = String(formData.get('romaji') ?? '').trim() || null;
   const kanji = String(formData.get('kanji') ?? '').trim() || null;
+  const furigana = String(formData.get('furigana') ?? '').trim() || null;
   const partOfSpeech = partOfSpeechValue(formData.get('partOfSpeech') as string | null);
   const translations = parseTranslations(formData);
 
@@ -142,12 +145,12 @@ export async function upsertVocabularyAction(formData: FormData): Promise<void> 
 
   if (Number.isFinite(id) && id > 0) {
     await repo.updateVocabulary(id, {
-      kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
+      kanji, hiragana, romaji, furigana, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
       ...grammarFlagsAll(formData), translations, examples, collocations,
     });
   } else {
     await repo.createVocabulary(
-      { kanji, hiragana, romaji, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
+      { kanji, hiragana, romaji, furigana, jlptLevel: jft.jlptLevel, jftBasic: jft.jftBasic, partOfSpeech,
         ...grammarFlagsAll(formData), translations, examples, collocations },
       null,
     );
@@ -161,6 +164,52 @@ export async function removeVocabularyAction(formData: FormData): Promise<void> 
   const id = Number(formData.get('id'));
   if (Number.isFinite(id) && id > 0) await repo.deleteVocabulary(id);
   revalidatePath('/admin/content');
+}
+
+export type BulkCreateResult = {
+  created: number;
+  skipped: number;
+  errors: string[];
+};
+
+/**
+ * Bulk-import vocabulary from a client-parsed JSON payload. Every row is
+ * re-validated server-side; invalid rows are skipped and reported back so a
+ * malformed file never leaves the database half-broken.
+ */
+export async function bulkCreateVocabularyAction(formData: FormData): Promise<BulkCreateResult> {
+  await requireRole('admin', 'super_admin');
+  const repo = await getRepository();
+
+  const payload = String(formData.get('payload') ?? '');
+  let parsed: { rows?: Record<string, unknown>[]; deckIds?: number[] };
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return { created: 0, skipped: 0, errors: ['Payload tidak valid.'] };
+  }
+  if (!Array.isArray(parsed?.rows)) return { created: 0, skipped: 0, errors: ['Tidak ada baris valid.'] };
+
+  const parsedRows = parsed.rows.map((r, i) => buildBulkRow(r ?? {}, i + 1));
+  const valid = parsedRows.filter(isValidRow);
+  const deckIds = (parsed.deckIds ?? [])
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n > 0);
+
+  const created = valid.length
+    ? await repo.createVocabularyBatch(
+        valid.map((r) => r.input),
+        null,
+        deckIds,
+      )
+    : 0;
+
+  const errors = parsedRows
+    .filter((r) => r.errors.length > 0)
+    .map((r) => `Baris ${r.line}: ${r.errors.join('; ')}`);
+
+  if (created > 0) revalidatePath('/admin/content');
+  return { created, skipped: errors.length, errors };
 }
 
 export async function createDeckAction(formData: FormData): Promise<void> {

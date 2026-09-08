@@ -420,6 +420,7 @@ export class PostgresVocabRepo implements VocabRepository {
         kanji: input.kanji ?? null,
         hiragana: input.hiragana,
         romaji: input.romaji ?? null,
+        furigana: input.furigana ?? null,
         jlptLevel: (input.jlptLevel as JlptLevel | null) ?? null,
         jftBasic: input.jftBasic ?? false,
         partOfSpeech: (input.partOfSpeech as PartOfSpeech | null) ?? null,
@@ -460,6 +461,68 @@ export class PostgresVocabRepo implements VocabRepository {
       id: v.id, kanji: v.kanji, hiragana: v.hiragana, romaji: v.romaji,
       jlptLevel: v.jlptLevel as JlptLevel | null, jftBasic: v.jftBasic, partOfSpeech: toPartOfSpeech(v.partOfSpeech), ...vocabGrammar(v), isActive: v.isActive,
     };
+  }
+
+  async createVocabularyBatch(
+    inputs: TagWithVocabInput[],
+    createdBy: string | null,
+    deckIds: number[],
+  ): Promise<number> {
+    if (inputs.length === 0) return 0;
+    await getDb().transaction(async (tx) => {
+      for (const input of inputs) {
+        const inserted = await tx
+          .insert(vocabulary)
+          .values({
+            kanji: input.kanji ?? null,
+            hiragana: input.hiragana,
+            romaji: input.romaji ?? null,
+            furigana: input.furigana ?? null,
+            jlptLevel: (input.jlptLevel as JlptLevel | null) ?? null,
+            jftBasic: input.jftBasic ?? false,
+            partOfSpeech: (input.partOfSpeech as PartOfSpeech | null) ?? null,
+            godanVerb: input.godanVerb ?? false,
+            ichidanVerb: input.ichidanVerb ?? false,
+            fukisoku: input.fukisoku ?? false,
+            iAdjective: input.iAdjective ?? false,
+            naAdjective: input.naAdjective ?? false,
+            jidoushi: input.jidoushi ?? false,
+            tadoushi: input.tadoushi ?? false,
+            verbCollocation: input.verbCollocation ?? false,
+            createdBy,
+          })
+          .returning();
+        const vocab = inserted[0];
+        if (input.translations.length) {
+          await tx.insert(vocabularyTranslations).values(
+            input.translations.map((t) => ({ vocabularyId: vocab.id, locale: t.locale, meaning: t.meaning })),
+          );
+        }
+        for (const ex of input.examples ?? []) {
+          const exRow = await tx
+            .insert(exampleSentences)
+            .values({ vocabularyId: vocab.id, japanese: ex.japanese })
+            .returning();
+          if (ex.translations.length) {
+            await tx.insert(exampleSentenceTranslations).values(
+              ex.translations.map((t) => ({ exampleSentenceId: exRow[0].id, locale: t.locale, translation: t.translation })),
+            );
+          }
+        }
+        for (const c of input.collocations ?? []) {
+          await tx
+            .insert(verbCollocations)
+            .values({ vocabularyId: vocab.id, collocation: c.collocation, meaning: c.meaning ?? null });
+        }
+        for (const deckId of deckIds) {
+          await tx
+            .insert(deckVocabulary)
+            .values({ deckId, vocabularyId: vocab.id, orderInDeck: null })
+            .onConflictDoNothing();
+        }
+      }
+    });
+    return inputs.length;
   }
 
   async updateVocabulary(id: number, patch: Partial<TagWithVocabInput>): Promise<Vocabulary | null> {

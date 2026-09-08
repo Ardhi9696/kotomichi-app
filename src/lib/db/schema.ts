@@ -57,6 +57,7 @@ export const vocabulary = pgTable(
     partOfSpeech: text('part_of_speech').$type<
       'noun' | 'verb' | 'adverb' | 'adjective' | 'conjunction' | 'demonstrative' | null
     >(),
+    furigana: text('furigana'),
     godanVerb: boolean('godan_verb').notNull().default(false),
     ichidanVerb: boolean('ichidan_verb').notNull().default(false),
     fukisoku: boolean('fukisoku').notNull().default(false),

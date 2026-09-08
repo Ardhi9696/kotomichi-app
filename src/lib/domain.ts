@@ -48,6 +48,7 @@ export interface Vocabulary {
   kanji: string | null;
   hiragana: string;
   romaji?: string | null;
+  furigana?: string | null;
   jlptLevel?: JlptLevel | null;
   jftBasic: boolean;
   partOfSpeech?: PartOfSpeech | null;

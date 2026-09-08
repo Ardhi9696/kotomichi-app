@@ -31,6 +31,7 @@ export interface TagWithVocabInput {
   kanji?: string | null;
   hiragana: string;
   romaji?: string | null;
+  furigana?: string | null;
   jlptLevel?: JlptLevel | null;
   jftBasic?: boolean;
   partOfSpeech?: PartOfSpeech | null;
@@ -125,6 +126,15 @@ export interface VocabRepository {
   getVocabularyById(id: number): Promise<WordCard | null>;
   getWordsByIds(ids: number[]): Promise<WordCard[]>;
   createVocabulary(input: TagWithVocabInput, createdBy: string | null): Promise<Vocabulary>;
+  /**
+   * Create several vocabulary entries atomically and (optionally) link them to
+   * decks. Returns the number of words actually inserted.
+   */
+  createVocabularyBatch(
+    inputs: TagWithVocabInput[],
+    createdBy: string | null,
+    deckIds: number[],
+  ): Promise<number>;
   updateVocabulary(id: number, patch: Partial<TagWithVocabInput>): Promise<Vocabulary | null>;
   deleteVocabulary(id: number): Promise<void>;
 

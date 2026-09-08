@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { removeVocabularyAction } from '@/app/actions/admin';
 import { ConfirmModal } from '@/components/confirm-modal';
 import { VocabFormModal } from '@/components/vocab-form-modal';
+import { VocabularyBulkModal } from '@/components/vocabulary-bulk-modal';
 import type { Deck, WordCard } from '@/lib/domain';
 
 function LevelBadges({ word }: { word: WordCard }) {
@@ -26,6 +27,8 @@ function LevelBadges({ word }: { word: WordCard }) {
 
 export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Deck[] }) {
   const [createOpen, setCreateOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [editWord, setEditWord] = useState<WordCard | null>(null);
   const [deleteWord, setDeleteWord] = useState<WordCard | null>(null);
   const [formKey, setFormKey] = useState(0);
@@ -36,17 +39,49 @@ export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Dec
         <h3 className="font-serif text-lg font-bold text-ink-800 dark:text-ink-100">
           Vocabulary ({words.length} words)
         </h3>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={() => {
-            setEditWord(null);
-            setFormKey((k) => k + 1);
-            setCreateOpen(true);
-          }}
-        >
-          + Add vocabulary
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            + Add vocabulary
+            <span aria-hidden="true" className="ml-1 text-xs">▾</span>
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 z-30 mt-1 w-56 overflow-hidden rounded-xl border border-ink-200 bg-washi-50 shadow-card dark:border-ink-800 dark:bg-ink-900"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-100 dark:text-ink-200 dark:hover:bg-ink-800"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setEditWord(null);
+                  setFormKey((k) => k + 1);
+                  setCreateOpen(true);
+                }}
+              >
+                Add single
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full border-t border-ink-100 px-4 py-2.5 text-left text-sm text-ink-700 hover:bg-ink-100 dark:border-ink-800 dark:text-ink-200 dark:hover:bg-ink-800"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setBulkOpen(true);
+                }}
+              >
+                Import (CSV/Excel)
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -94,6 +129,12 @@ export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Dec
         }}
         decks={decks}
         initial={editWord}
+      />
+
+      <VocabularyBulkModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        decks={decks}
       />
 
       <ConfirmModal

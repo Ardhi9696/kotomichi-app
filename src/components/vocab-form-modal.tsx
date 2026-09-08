@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 
 import { createVocabularyAction, upsertVocabularyAction } from '@/app/actions/admin';
 import { useFlash } from '@/components/flash-provider';
+import { convertFuriganaToBracketFormat } from '@/lib/bulk-import';
 import type { Deck, WordCard } from '@/lib/domain';
 
 const JLPT: Array<'' | 'N5' | 'N4' | 'N3' | 'N2' | 'N1'> = ['', 'N5', 'N4', 'N3', 'N2', 'N1'];
@@ -70,9 +71,13 @@ export function VocabFormModal({
   const [verbCollocation, setVerbCollocation] = useState(Boolean(initial?.vocabulary.verbCollocation));
   const [kanji, setKanji] = useState(initial?.vocabulary.kanji ?? '');
   const [hiragana, setHiragana] = useState(initial?.vocabulary.hiragana ?? '');
+  const [furigana, setFurigana] = useState(initial?.vocabulary.furigana ?? '');
   const [romaji, setRomaji] = useState(initial?.vocabulary.romaji ?? '');
   const [meaningId, setMeaningId] = useState(initial?.translations['id'] ?? '');
   const [meaningEn, setMeaningEn] = useState(initial?.translations['en'] ?? '');
+
+  // Preview konversi furigana ke format bracket mono-ruby
+  const previewFurigana = convertFuriganaToBracketFormat(kanji, furigana) || '';
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -86,8 +91,10 @@ export function VocabFormModal({
   const hasChanges = editing ? (
     kanji !== (v?.kanji ?? '') ||
     hiragana !== (v?.hiragana ?? '') ||
+    furigana !== (v?.furigana ?? '') ||
     romaji !== (v?.romaji ?? '') ||
     meaningId !== (initial?.translations['id'] ?? '') ||
+    meaningEn !== (initial?.translations['en'] ?? '') ||
     meaningEn !== (initial?.translations['en'] ?? '') ||
     jftBasic !== Boolean(v?.jftBasic) ||
     partOfSpeech !== (v?.partOfSpeech ?? '') ||
@@ -120,6 +127,15 @@ export function VocabFormModal({
   const submit = async (formData: FormData) => {
     setPending(true);
     try {
+      // Ambil nilai mentah sebelum dikonversi
+      const rawFurigana = String(formData.get('furigana') ?? '').trim();
+      const rawKanji = String(formData.get('kanji') ?? '').trim();
+      // Lakukan konversi jika ada keduanya
+      if (rawFurigana && rawKanji) {
+        const converted = convertFuriganaToBracketFormat(rawKanji, rawFurigana);
+        // Set nilai furigana yang sudah dikonversi ke formData
+        formData.set('furigana', converted ?? '');
+      }
       if (editing) {
         await upsertVocabularyAction(formData);
       } else {
@@ -185,6 +201,22 @@ export function VocabFormModal({
                 required
                 className="field"
               />
+              <input 
+                name="furigana"
+                value={furigana}
+                onChange={(e) => setFurigana(e.target.value)}
+                placeholder="Furigana (hanya huruf romaji, opsional)" 
+                className="field" 
+              />
+              <div className="mt-2 text-xs text-ink-500 dark:text-ink-400">
+                {previewFurigana ? (
+                  <span className="font-mono whitespace-nowrap">
+                    {previewFurigana}
+                  </span>
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
               <input 
                 name="romaji" 
                 value={romaji}

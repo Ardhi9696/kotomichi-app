@@ -193,6 +193,7 @@ export class InMemoryVocabRepo implements VocabRepository {
       kanji: input.kanji ?? null,
       hiragana: input.hiragana,
       romaji: input.romaji ?? null,
+      furigana: input.furigana ?? null,
       jlptLevel: input.jlptLevel ?? null,
       jftBasic: input.jftBasic ?? false,
       partOfSpeech: input.partOfSpeech ?? null,
@@ -349,6 +350,18 @@ export class InMemoryVocabRepo implements VocabRepository {
 
   async getDeckWordCount(deckId: number): Promise<number> {
     return (this.deckMembership.get(deckId) ?? []).length;
+  }
+
+  async createVocabularyBatch(
+    inputs: TagWithVocabInput[],
+    createdBy: string | null,
+    deckIds: number[],
+  ): Promise<number> {
+    for (const input of inputs) {
+      const created = await this.createVocabulary(input, createdBy);
+      for (const deckId of deckIds) await this.addVocabularyToDeck(deckId, created.id);
+    }
+    return inputs.length;
   }
 
   async addVocabularyToDeck(deckId: number, vocabularyId: number, orderInDeck?: number): Promise<void> {
