@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, useFormStatus } from 'react-dom';
 
 import { useRouter } from 'next/navigation';
 
@@ -13,6 +13,28 @@ const JLPT: Array<'' | 'N5' | 'N4' | 'N3' | 'N2' | 'N1'> = ['', 'N5', 'N4', 'N3'
 
 function exampleTr(examples: NonNullable<WordCard['examples']>[number]['translations'], locale: string): string {
   return examples.find((t) => t.locale === locale)?.translation ?? '';
+}
+
+function SaveButton({ editing, noChanges }: { editing: boolean; noChanges: boolean }) {
+  const { pending } = useFormStatus();
+  const busy = pending;
+  const label = busy ? (editing ? 'Editing...' : 'Saving...') : editing ? 'Save' : 'Add vocabulary';
+  return (
+    <button
+      type="submit"
+      className="btn-primary inline-flex items-center gap-2"
+      disabled={busy || noChanges}
+      aria-busy={busy}
+    >
+      {busy && (
+        <span
+          className="h-4 w-4 animate-spin rounded-full border-2 border-washi-50/40 border-t-washi-50"
+          aria-hidden="true"
+        />
+      )}
+      {label}
+    </button>
+  );
 }
 
 export function VocabFormModal({
@@ -402,19 +424,7 @@ export function VocabFormModal({
 
           <div className="flex justify-end gap-2 border-t border-ink-200 px-6 py-4 dark:border-ink-800">
             <button type="button" className="btn-secondary" onClick={onClose} disabled={pending}>Cancel</button>
-            <button
-              type="submit"
-              className="btn-primary inline-flex items-center gap-2"
-              disabled={pending || (editing && !hasChanges)}
-            >
-              {pending && (
-                <span
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-washi-50/40 border-t-washi-50"
-                  aria-hidden="true"
-                />
-              )}
-              {pending ? 'Saving...' : editing ? 'Save' : 'Add vocabulary'}
-            </button>
+            <SaveButton editing={editing} noChanges={editing && !hasChanges} />
           </div>
 
           {pending && (
@@ -424,7 +434,9 @@ export function VocabFormModal({
               aria-live="polite"
             >
               <span className="h-8 w-8 animate-spin rounded-full border-2 border-ink-200 border-t-shu-500 dark:border-ink-700 dark:border-t-shu-400" />
-              <span className="text-sm font-medium text-ink-600 dark:text-ink-200">Saving…</span>
+              <span className="text-sm font-medium text-ink-600 dark:text-ink-200">
+              {editing ? 'Editing…' : 'Saving…'}
+            </span>
             </div>
           )}
         </form>
