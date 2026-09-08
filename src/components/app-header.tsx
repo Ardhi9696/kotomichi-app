@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 
 import { signOutAction } from '@/app/actions/auth';
 import { ConfirmModal } from '@/components/confirm-modal';
@@ -21,6 +21,8 @@ export function AppHeader({
   const t = useTranslations();
   const pathname = usePathname();
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [menuOpenPath, setMenuOpenPath] = useState<string | null>(null);
 
   const menuOpen = menuOpenPath !== null && menuOpenPath === pathname;
@@ -51,8 +53,13 @@ export function AppHeader({
 
   const onLogoutConfirm = () => {
     setLogoutOpen(false);
-    void signOutAction();
+    setLoggingOut(true);
+    startTransition(() => {
+      void signOutAction().finally(() => setLoggingOut(false));
+    });
   };
+
+  const logoutBusy = loggingOut || isPending;
 
   return (
     <header className="sticky top-0 z-30 border-b border-ink-200/70 bg-washi-100/85 backdrop-blur dark:border-ink-800/70 dark:bg-ink-950">
@@ -79,8 +86,8 @@ export function AppHeader({
         <div className="ml-auto hidden items-center gap-1 md:flex">
           <div>
             {signedIn ? (
-              <button type="button" className="btn-ghost" onClick={() => setLogoutOpen(true)}>
-                {t('nav.logout')}
+              <button type="button" className="btn-ghost" disabled={logoutBusy} onClick={() => setLogoutOpen(true)}>
+                {logoutBusy ? t('nav.loggingOut') : t('nav.logout')}
               </button>
             ) : (
               <Link href="/login" className="btn-ghost">
@@ -132,8 +139,8 @@ export function AppHeader({
             {signedIn && profile && <SettingsDialog profile={profile} />}
             <div className="mt-1 border-t border-ink-200/70 pt-2 dark:border-ink-800/70">
               {signedIn ? (
-                <button type="button" className="btn-ghost w-full justify-start" onClick={() => setLogoutOpen(true)}>
-                  {t('nav.logout')}
+                <button type="button" className="btn-ghost w-full justify-start" disabled={logoutBusy} onClick={() => setLogoutOpen(true)}>
+                  {logoutBusy ? t('nav.loggingOut') : t('nav.logout')}
                 </button>
               ) : (
                 <Link href="/login" className="btn-ghost w-full justify-start">

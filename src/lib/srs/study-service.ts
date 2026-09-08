@@ -435,6 +435,30 @@ export class StudyService {
     }
     return out;
   }
+
+  /**
+   * Whether a deck is unlocked for the user, following the same
+   * previous-deck gating as `decksWithProgress` (each preceding deck must be
+   * mastered). Deliberately skips the due/new-card bookkeeping so quiz page
+   * loads don't pay for the full dashboard computation.
+   */
+  async isDeckUnlocked(userId: string, deckId: number): Promise<boolean> {
+    const decks = await this.repo.listDecks({ publishedOnly: true });
+    const threshold = this.config.deck.masteryThreshold;
+
+    let previousMastered = true;
+    for (const deck of decks) {
+      if (deck.id === deckId) return previousMastered;
+      const words = await this.repo.getDeckWords(deck.id);
+      const ids = words.map((w) => w.vocabulary.id);
+      const progress = await this.repo.getProgressForVocabulary(userId, ids);
+      const reviewedCount = ids.filter((id) => progress.some((p) => p.vocabularyId === id)).length;
+      const rValues = [...progress].filter((p) => p.retrievability !== null).map((p) => p.retrievability as number);
+      const mastery = rValues.length > 0 ? rValues.reduce((a, b) => a + b, 0) / rValues.length : null;
+      previousMastered = reviewedCount > 0 && (mastery ?? 0) >= threshold;
+    }
+    return false;
+  }
 }
 
 function safeDirection(d: Direction): Direction {

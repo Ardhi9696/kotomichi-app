@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 
 import { createVocabularyAction, upsertVocabularyAction } from '@/app/actions/admin';
+import { useFlash } from '@/components/flash-provider';
 import type { Deck, WordCard } from '@/lib/domain';
 
 const JLPT: Array<'' | 'N5' | 'N4' | 'N3' | 'N2' | 'N1'> = ['', 'N5', 'N4', 'N3', 'N2', 'N1'];
@@ -26,6 +27,7 @@ export function VocabFormModal({
   initial?: WordCard | null;
 }) {
   const router = useRouter();
+  const { show } = useFlash();
   const [pending, setPending] = useState(false);
   const [examples, setExamples] = useState<{ jp: string; id: string; en: string }[]>(() =>
     initial?.examples?.length
@@ -103,6 +105,9 @@ export function VocabFormModal({
       }
       onClose();
       router.refresh();
+      show('success', editing ? 'Vocabulary updated.' : 'Vocabulary created.');
+    } catch (err) {
+      show('error', err instanceof Error ? err.message : 'Failed to save vocabulary.');
     } finally {
       setPending(false);
     }

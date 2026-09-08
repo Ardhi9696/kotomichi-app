@@ -15,6 +15,7 @@
     "login": "Masuk",
     "register": "Buat akun",
     "logout": "Keluar",
+    "loggingOut": "Keluar…",
     "menu": "Menu"
   },
   "auth": {

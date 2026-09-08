@@ -97,24 +97,26 @@ export async function loadQuizPageData(
 ): Promise<QuizPageData | null> {
   await requireLearner();
   const { user, profile, repo, service } = await getStudyContext();
-  const now = new Date().toISOString();
   const locale = profile.preferredLocale;
 
-  const states = await service.decksWithProgress(user.id, locale, now);
-  const active = states.find((s) => s.deck.id === deckId && !s.deck.isLocked);
-  if (!active) return null;
+  // Lean path (no full decksWithProgress): only the target deck's words and
+  // its gating chain matter, so quiz loads stay cheap even on cold starts.
+  const deck = await repo.getDeck(deckId);
+  if (!deck || !deck.isPublished) return null;
+  const unlocked = await service.isDeckUnlocked(user.id, deck.id);
+  if (!unlocked) return null;
 
-  const words = await repo.getDeckWords(active.deck.id);
+  const words = await repo.getDeckWords(deck.id);
   const totalSessions = Math.max(1, Math.ceil(words.length / WORDS_PER_SESSION));
   const clamped = Math.max(0, Math.min(sessionIndex, totalSessions - 1));
 
-  const session = await repo.createQuizSession(user.id, active.deck.id, mode, totalSessions, clamped);
+  const session = await repo.createQuizSession(user.id, deck.id, mode, totalSessions, clamped);
   const sessionWords = words.slice(clamped * WORDS_PER_SESSION, (clamped + 1) * WORDS_PER_SESSION);
   const questions = buildQuizSession(sessionWords, locale, mode);
 
   return {
-    deckId: active.deck.id,
-    deckTitle: active.deck.title,
+    deckId: deck.id,
+    deckTitle: deck.title,
     mode,
     sessionIndex: clamped,
     totalSessions,

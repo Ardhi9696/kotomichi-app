@@ -95,6 +95,39 @@ describe('StudyService', () => {
     expect(states[0].deck.wordCount).toBeGreaterThan(0);
   });
 
+  it('isDeckUnlocked matches the gating chain for the first deck, and locks a deck whose predecessor is unmastered', async () => {
+    const { service } = await svc();
+    // First deck is unlocked by construction.
+    expect(await service.isDeckUnlocked(USER.id, 101)).toBe(true);
+
+    // Master deck 101 fully (correctly answer all of its words), then the next deck unlocks.
+    const words101 = (await service.decksWithProgress(USER.id, 'id', NOW))[0].newCards;
+    for (const card of words101) {
+      for (const direction of [1, 2, 3, 4, 5, 6]) {
+        await service.submit(USER, {
+          cardId: `x:${card.vocabularyId}`, vocabularyId: card.vocabularyId, direction,
+          elapsedMs: 3000, correct: true, answer: 'x',
+        }, NOW, 'id');
+      }
+    }
+    // 102 unlocks; 103 stays locked because its predecessor (102) is unmastered.
+    expect(await service.isDeckUnlocked(USER.id, 102)).toBe(true);
+    expect(await service.isDeckUnlocked(USER.id, 103)).toBe(false);
+    expect(await service.isDeckUnlocked(USER.id, 999)).toBe(false);
+
+    // Unlock 103 the same way: master every word of deck 102.
+    const words102 = (await service.decksWithProgress(USER.id, 'id', NOW))[1].newCards;
+    for (const card of words102) {
+      for (const direction of [1, 2, 3, 4, 5, 6]) {
+        await service.submit(USER, {
+          cardId: `x:${card.vocabularyId}`, vocabularyId: card.vocabularyId, direction,
+          elapsedMs: 3000, correct: true, answer: 'x',
+        }, NOW, 'id');
+      }
+    }
+    expect(await service.isDeckUnlocked(USER.id, 103)).toBe(true);
+  });
+
   it('saves self-check progress but awards no exp or streak', async () => {
     const { repo, service } = await svc();
     const profile = { ...USER, exp: 120, level: 3, currentStreak: 2, longestStreak: 4, lastReviewDate: '2026-09-04' };

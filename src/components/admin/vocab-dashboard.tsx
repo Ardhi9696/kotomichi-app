@@ -28,6 +28,7 @@ export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Dec
   const [createOpen, setCreateOpen] = useState(false);
   const [editWord, setEditWord] = useState<WordCard | null>(null);
   const [deleteWord, setDeleteWord] = useState<WordCard | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   return (
     <div>
@@ -35,7 +36,15 @@ export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Dec
         <h3 className="font-serif text-lg font-bold text-ink-800 dark:text-ink-100">
           Vocabulary ({words.length} words)
         </h3>
-        <button type="button" className="btn-primary" onClick={() => setCreateOpen(true)}>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => {
+            setEditWord(null);
+            setFormKey((k) => k + 1);
+            setCreateOpen(true);
+          }}
+        >
           + Add vocabulary
         </button>
       </div>
@@ -77,7 +86,7 @@ export function VocabDashboard({ words, decks }: { words: WordCard[]; decks: Dec
       </div>
 
       <VocabFormModal
-        key={editWord ? `edit-${editWord.vocabulary.id}` : 'create'}
+        key={editWord ? `edit-${editWord.vocabulary.id}` : `create-${formKey}`}
         open={createOpen || Boolean(editWord)}
         onClose={() => {
           setCreateOpen(false);

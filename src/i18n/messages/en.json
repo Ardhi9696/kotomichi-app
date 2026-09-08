@@ -15,6 +15,7 @@
     "login": "Log in",
     "register": "Create account",
     "logout": "Log out",
+    "loggingOut": "Logging out…",
     "menu": "Menu"
   },
   "auth": {

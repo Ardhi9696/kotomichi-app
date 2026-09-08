@@ -8,6 +8,9 @@
 
 import 'server-only';
 
+import { cache } from 'react';
+
+import type { AppConfig } from '@/lib/domain';
 import type { AuthProvider } from '@/lib/ports/auth-port';
 import type { VocabRepository } from '@/lib/ports/db-port';
 import { PostgresVocabRepo } from '@/lib/adapters/postgres/vocab.repo';
@@ -81,13 +84,17 @@ export async function isDemoMode(): Promise<boolean> {
 }
 
 /** Public self-signup gate (remote config boolean, toggled by a super admin). */
-export async function isSignupEnabled(): Promise<boolean> {
-  const repo = await getRepository();
-  return (await repo.getAppConfig()).signup.enabled;
+export function isSignupEnabled(): Promise<boolean> {
+  return getAppConfigCached().then((c) => c.signup.enabled);
 }
 
 /** Public password-reset gate (remote config boolean, toggled by a super admin). */
-export async function isResetPasswordEnabled(): Promise<boolean> {
-  const repo = await getRepository();
-  return (await repo.getAppConfig()).signup.resetPassword;
+export function isResetPasswordEnabled(): Promise<boolean> {
+  return getAppConfigCached().then((c) => c.signup.resetPassword);
 }
+
+/** App config memoized once per request — multiple consumers share one read. */
+export const getAppConfigCached = cache(async (): Promise<AppConfig> => {
+  const repo = await getRepository();
+  return repo.getAppConfig();
+});

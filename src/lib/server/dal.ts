@@ -58,11 +58,11 @@ export interface CurrentUser {
 }
 
 /** Authenticated user or null — for pages that can render signed-out. */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const user = await getSessionUser();
   if (!user) return null;
   return { user, profile: await ensureProfile(user) };
-}
+});
 
 /** Redirects to /login when signed out. */
 export async function requireUser(): Promise<CurrentUser> {
