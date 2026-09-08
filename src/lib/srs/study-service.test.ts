@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { InMemoryVocabRepo } from '@/lib/adapters/inmemory/vocab.repo';
 import { StudyService } from '@/lib/srs/study-service';
+import type { Direction } from '@/lib/srs/directions';
 import type { UserProfile } from '@/lib/domain';
-
 const USER: UserProfile = {
   id: 'aaaa0000-0000-0000-0000-000000000001',
   displayName: 'Learner',
@@ -96,35 +96,31 @@ describe('StudyService', () => {
   });
 
   it('isDeckUnlocked matches the gating chain for the first deck, and locks a deck whose predecessor is unmastered', async () => {
-    const { service } = await svc();
+    const { repo, service } = await svc();
     // First deck is unlocked by construction.
     expect(await service.isDeckUnlocked(USER.id, 101)).toBe(true);
 
-    // Master deck 101 fully (correctly answer all of its words), then the next deck unlocks.
-    const words101 = (await service.decksWithProgress(USER.id, 'id', NOW))[0].newCards;
-    for (const card of words101) {
-      for (const direction of [1, 2, 3, 4, 5, 6]) {
-        await service.submit(USER, {
-          cardId: `x:${card.vocabularyId}`, vocabularyId: card.vocabularyId, direction,
-          elapsedMs: 3000, correct: true, answer: 'x',
-        }, NOW, 'id');
+    const master = async (deckId: number) => {
+      const words = await repo.getDeckWords(deckId);
+      for (const word of words) {
+        for (const direction of [1, 2, 3, 4, 5, 6] as const satisfies readonly Direction[]) {
+          await service.submit(USER, {
+            cardId: `x:${word.vocabulary.id}`, vocabularyId: word.vocabulary.id, direction,
+            elapsedMs: 3000, correct: true, answer: 'x',
+          }, NOW, 'id');
+        }
       }
-    }
+    };
+
+    // Master deck 101 fully (correctly answer all of its words), then the next deck unlocks.
+    await master(101);
     // 102 unlocks; 103 stays locked because its predecessor (102) is unmastered.
     expect(await service.isDeckUnlocked(USER.id, 102)).toBe(true);
     expect(await service.isDeckUnlocked(USER.id, 103)).toBe(false);
     expect(await service.isDeckUnlocked(USER.id, 999)).toBe(false);
 
     // Unlock 103 the same way: master every word of deck 102.
-    const words102 = (await service.decksWithProgress(USER.id, 'id', NOW))[1].newCards;
-    for (const card of words102) {
-      for (const direction of [1, 2, 3, 4, 5, 6]) {
-        await service.submit(USER, {
-          cardId: `x:${card.vocabularyId}`, vocabularyId: card.vocabularyId, direction,
-          elapsedMs: 3000, correct: true, answer: 'x',
-        }, NOW, 'id');
-      }
-    }
+    await master(102);
     expect(await service.isDeckUnlocked(USER.id, 103)).toBe(true);
   });
 
