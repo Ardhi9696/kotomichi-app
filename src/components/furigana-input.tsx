@@ -154,6 +154,21 @@ export function FuriganaInput({
         </div>
       </div>
 
+      <div>
+        <label className="mb-1 block text-[11px] text-ink-500 dark:text-ink-400">
+          Preview (bracket) — bisa diedit langsung untuk custom
+        </label>
+        <input
+          value={value}
+          onChange={(ev) => onChange(ev.target.value)}
+          placeholder="[大[おお]][雨[あめ]]"
+          className="field font-mono"
+        />
+        <p className="mt-1 text-[11px] text-ink-400 dark:text-ink-500">
+          Hasil ini yang akan disimpan. Ubah langsung jika butuh format custom.
+        </p>
+      </div>
+
       <p className="text-xs text-ink-500 dark:text-ink-400">
         {isGroup ? 'Satu furigana untuk seluruh kanji.' : 'Setiap kanji punya satu furigana.'}
       </p>
