@@ -63,16 +63,6 @@ function truthy(v: string): boolean {
   return ['true', '1', 'yes', 'ya', 'y'].includes(v.toLowerCase());
 }
 
-/**
- * Convert comma-separated furigana input into bracket mono-ruby format.
- * 
- * User input: "かん,じ"
- * Kanji:      "漢字"
- * Result:     "[漢[かん]][字[じ]]"
- * 
- * If furigana count < kanji chars, missing ones get empty brackets.
- * If furigana count > kanji chars, extra furigana are dropped.
- */
 export function convertFuriganaToBracketFormat(
   kanji: string,
   furiganaInput: string,
@@ -83,6 +73,7 @@ export function convertFuriganaToBracketFormat(
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+
   const chars = kanji.split('');
 
   const parts = chars.map((_char, index) => {
