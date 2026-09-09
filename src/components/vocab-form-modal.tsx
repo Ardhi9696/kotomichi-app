@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 
 import { createVocabularyAction, upsertVocabularyAction } from '@/app/actions/admin';
 import { useFlash } from '@/components/flash-provider';
-import { convertFuriganaToBracketFormat } from '@/lib/bulk-import';
+import { FuriganaInput } from '@/components/furigana-input';
 import type { Deck, WordCard } from '@/lib/domain';
 
 const JLPT: Array<'' | 'N5' | 'N4' | 'N3' | 'N2' | 'N1'> = ['', 'N5', 'N4', 'N3', 'N2', 'N1'];
@@ -77,9 +77,6 @@ export function VocabFormModal({
   const [meaningId, setMeaningId] = useState(initial?.translations['id'] ?? '');
   const [meaningEn, setMeaningEn] = useState(initial?.translations['en'] ?? '');
 
-  // Preview konversi furigana ke format bracket mono-ruby
-  const previewFurigana = convertFuriganaToBracketFormat(kanji, furigana) || '';
-
   if (!open || typeof document === 'undefined') return null;
 
   const editing = Boolean(initial);
@@ -128,15 +125,8 @@ export function VocabFormModal({
   const submit = async (formData: FormData) => {
     setPending(true);
     try {
-      // Ambil nilai mentah sebelum dikonversi
-      const rawFurigana = String(formData.get('furigana') ?? '').trim();
-      const rawKanji = String(formData.get('kanji') ?? '').trim();
-      // Lakukan konversi jika ada keduanya
-      if (rawFurigana && rawKanji) {
-        const converted = convertFuriganaToBracketFormat(rawKanji, rawFurigana);
-        // Set nilai furigana yang sudah dikonversi ke formData
-        formData.set('furigana', converted ?? '');
-      }
+      // furigana sudah berbentuk bracket dari FuriganaInput
+      formData.set('furigana', furigana || '');
       if (editing) {
         await upsertVocabularyAction(formData);
       } else {
@@ -203,22 +193,6 @@ export function VocabFormModal({
                 className="field"
               />
               <input 
-                name="furigana"
-                value={furigana}
-                onChange={(e) => setFurigana(e.target.value)}
-                placeholder="Furigana (hanya huruf romaji, opsional)" 
-                className="field" 
-              />
-              <div className="mt-2 text-xs text-ink-500 dark:text-ink-400">
-                {previewFurigana ? (
-                  <span className="font-mono whitespace-nowrap">
-                    {previewFurigana}
-                  </span>
-                ) : (
-                  <span>—</span>
-                )}
-              </div>
-              <input 
                 name="romaji" 
                 value={romaji}
                 onChange={(e) => setRomaji(e.target.value)}
@@ -226,6 +200,8 @@ export function VocabFormModal({
                 className="field" 
               />
             </div>
+
+            <FuriganaInput value={furigana} onChange={setFurigana} />
 
             <label className="flex items-center gap-2 text-sm text-ink-700 dark:text-ink-200">
               <input

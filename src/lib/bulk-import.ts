@@ -6,6 +6,7 @@
 
 import type { JlptLevel, PartOfSpeech } from '@/lib/domain';
 import type { TagWithVocabInput } from '@/lib/ports/db-port';
+import { toBracketFurigana } from '@/lib/furigana';
 
 export const BULK_COLUMNS = [
   'kanji',
@@ -68,20 +69,12 @@ export function convertFuriganaToBracketFormat(
   furiganaInput: string,
 ): string | null {
   if (!furiganaInput) return null;
-
   const furiganas = furiganaInput
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
-
-  const chars = kanji.split('');
-
-  const parts = chars.map((_char, index) => {
-    const furigana = furiganas[index] ?? '';
-    return `[${_char}[${furigana}]]`;
-  });
-
-  return parts.join('');
+  if (furiganas.length === 0) return null;
+  return toBracketFurigana('mono', kanji, furiganas);
 }
 
 export interface BulkRowResult {
