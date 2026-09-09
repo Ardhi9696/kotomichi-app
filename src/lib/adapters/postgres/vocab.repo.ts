@@ -6,7 +6,7 @@
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 
-import type { ApplyReviewInput, DueEntry, TagWithVocabInput, VocabRepository } from '@/lib/ports/db-port';
+import type { ApplyReviewInput, DueEntry, TagWithVocabInput, VocabRepository, VocabularyPage, VocabularyQuery } from '@/lib/ports/db-port';
 import type {
   ActivityDay,
   AppConfig,
@@ -49,7 +49,7 @@ import {
   vocabularyTranslations,
 } from '@/lib/db/schema';
 import { assembleAppConfig, flattenAppConfig } from '@/lib/config/defaults';
-import { computeDayDetail, type DayStatsRow } from '@/lib/stats/overview';
+import { computeDayDetail } from '@/lib/stats/overview';
 import type { Direction } from '@/lib/srs/directions';
 import { getDb } from '@/lib/adapters/postgres/db';
 
@@ -380,6 +380,49 @@ export class PostgresVocabRepo implements VocabRepository {
       .orderBy(vocabulary.id)
       .limit(limit);
     return buildWords(db, rows.map((r) => r.id));
+  }
+
+  async queryVocabulary(query: VocabularyQuery): Promise<VocabularyPage> {
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.max(1, Math.min(query.pageSize ?? 20, 100));
+    const db = getDb();
+
+    const conditions = vocabQueryConditions(query);
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const countRows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(vocabulary)
+      .where(where);
+    const total = countRows[0]?.count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    const rows = await db
+      .select({ id: vocabulary.id })
+      .from(vocabulary)
+      .where(where)
+      .orderBy(vocabulary.id)
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    const words = await buildWords(db, rows.map((r) => r.id));
+    return {
+      words,
+      total,
+      page: Math.min(page, totalPages),
+      pageSize,
+      totalPages,
+    };
+  }
+
+  async countVocabulary(query: VocabularyQuery): Promise<number> {
+    const conditions = vocabQueryConditions(query);
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const rows = await getDb()
+      .select({ count: sql<number>`count(*)::int` })
+      .from(vocabulary)
+      .where(where);
+    return rows[0]?.count ?? 0;
   }
 
   async getVocabularyByReading(kanji: string | null, hiragana: string): Promise<Vocabulary | null> {
@@ -1234,4 +1277,27 @@ function letLike(col: AnyPgColumn, q: string) {
 }
 function ascDue() {
   return sql`due_at ASC`;
+}
+
+/** Build the shared WHERE conditions for an admin vocabulary query. */
+function vocabQueryConditions(query: VocabularyQuery) {
+  const conditions: ReturnType<typeof and>[] = [];
+  const q = query.q?.trim();
+  if (q) {
+    conditions.push(
+      or(
+        letLike(vocabulary.kanji, q),
+        letLike(vocabulary.hiragana, q),
+        letLike(vocabulary.romaji, q),
+        sql`EXISTS (SELECT 1 FROM vocabulary_translations vt WHERE vt.vocabulary_id = vocabulary.id AND vt.meaning ILIKE ${'%' + q + '%'})`,
+      )!,
+    );
+  }
+  if (query.jlptLevel != null) {
+    conditions.push(eq(vocabulary.jlptLevel, query.jlptLevel as JlptLevel));
+  }
+  if (query.partOfSpeech != null) {
+    conditions.push(eq(vocabulary.partOfSpeech, query.partOfSpeech as PartOfSpeech));
+  }
+  return conditions.filter(Boolean);
 }

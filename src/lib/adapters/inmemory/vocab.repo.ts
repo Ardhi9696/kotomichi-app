@@ -31,6 +31,8 @@ import type {
   DueEntry,
   TagWithVocabInput,
   VocabRepository,
+  VocabularyPage,
+  VocabularyQuery,
 } from '@/lib/ports/db-port';
 import { DEFAULTS, DEFAULT_THRESHOLDS } from '@/lib/config/defaults';
 import { buildSeedDocs } from '@/lib/adapters/inmemory/seed';
@@ -166,6 +168,45 @@ export class InMemoryVocabRepo implements VocabRepository {
     return [...hits]
       .sort((a, b) => a.vocabulary.id - b.vocabulary.id)
       .slice(0, limit);
+  }
+
+  private matchesVocabQuery(w: WordCard, query: VocabularyQuery): boolean {
+    const q = query.q?.trim().toLowerCase();
+    if (q) {
+      const text = [
+        w.vocabulary.kanji,
+        w.vocabulary.hiragana,
+        w.vocabulary.romaji,
+        ...Object.values(w.translations),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    if (query.jlptLevel != null && w.vocabulary.jlptLevel !== query.jlptLevel) return false;
+    if (query.partOfSpeech != null && w.vocabulary.partOfSpeech !== query.partOfSpeech) return false;
+    return true;
+  }
+
+  async queryVocabulary(query: VocabularyQuery): Promise<VocabularyPage> {
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.max(1, Math.min(query.pageSize ?? 20, 100));
+    const all = [...this.words.values()].filter((w) => this.matchesVocabQuery(w, query));
+    const total = all.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const start = (page - 1) * pageSize;
+    const words = all
+      .sort((a, b) => a.vocabulary.id - b.vocabulary.id)
+      .slice(start, start + pageSize)
+      .map((w) => structuredClone(w));
+    return { words, total, page: Math.min(page, totalPages), pageSize, totalPages };
+  }
+
+  async countVocabulary(query: VocabularyQuery): Promise<number> {
+    let count = 0;
+    for (const w of this.words.values()) if (this.matchesVocabQuery(w, query)) count++;
+    return count;
   }
 
   async getVocabularyByReading(kanji: string | null, hiragana: string): Promise<Vocabulary | null> {

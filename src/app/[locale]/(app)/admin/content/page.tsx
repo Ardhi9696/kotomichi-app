@@ -13,8 +13,8 @@ export default async function ContentPage() {
   const t = await getTranslations('admin');
 
   const repo = await getRepository();
-  const [words, decks] = await Promise.all([
-    repo.searchVocabulary('', { limit: 100 }),
+  const [initial, decks] = await Promise.all([
+    repo.queryVocabulary({ page: 1, pageSize: 20 }),
     repo.listDecks(),
   ]);
 
@@ -25,7 +25,7 @@ export default async function ContentPage() {
         <p className="mt-1 text-sm text-ink-600 dark:text-ink-300">{t('subtitle')}</p>
       </section>
 
-      <ContentTabs words={words} decks={decks} />
+      <ContentTabs initial={initial} decks={decks} />
 
       <p>
         <Link href="/dashboard" className="text-sm text-shu-500 hover:underline">← {t('overviewTitle')}</Link>

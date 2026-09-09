@@ -103,6 +103,24 @@ export interface DeckWordOrderInput {
   orderInDeck: number;
 }
 
+/** Search / filter / pagination options for the admin vocabulary list. */
+export interface VocabularyQuery {
+  q?: string;
+  jlptLevel?: JlptLevel | null;
+  partOfSpeech?: PartOfSpeech | null;
+  page?: number;
+  pageSize?: number;
+}
+
+/** A page of vocabulary results plus the total matching count. */
+export interface VocabularyPage {
+  words: WordCard[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface VocabRepository {
   // ---------- profiles ----------
   getUserProfile(userId: string): Promise<UserProfile | null>;
@@ -122,6 +140,13 @@ export interface VocabRepository {
 
   // ---------- vocabulary content ----------
   searchVocabulary(q: string, opts?: { limit?: number }): Promise<WordCard[]>;
+  /**
+   * Search + filter + paginate the admin vocabulary list. Returns a single
+   * page of full WordCards and the total number of matches (for paging).
+   */
+  queryVocabulary(query: VocabularyQuery): Promise<VocabularyPage>;
+  /** Total number of vocabulary matching a query (no paging). */
+  countVocabulary(query: VocabularyQuery): Promise<number>;
   getVocabularyByReading(kanji: string | null, hiragana: string): Promise<Vocabulary | null>;
   getVocabularyById(id: number): Promise<WordCard | null>;
   getWordsByIds(ids: number[]): Promise<WordCard[]>;

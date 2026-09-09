@@ -6,7 +6,7 @@ import { requireRole } from '@/lib/server/dal';
 import { getAuthProvider, getRepository } from '@/lib/server/runtime';
 import { buildBulkRow, isValidRow } from '@/lib/bulk-import';
 import type { JlptLevel, PartOfSpeech, Role, UserProfile } from '@/lib/domain';
-import type { TagWithVocabInput } from '@/lib/ports/db-port';
+import type { TagWithVocabInput, VocabularyQuery, VocabularyPage } from '@/lib/ports/db-port';
 
 function partOfSpeechValue(value: string | null): PartOfSpeech | null {
   const v = String(value ?? '');
@@ -349,8 +349,7 @@ export async function renameUserAction(_prev: RenameUserState, formData: FormDat
 
 export type ConfigSaveState = { error?: string; ok?: boolean };
 
-export async function setConfigAction(_prev: ConfigSaveState, formData: FormData): Promise<ConfigSaveState> {
-  await requireRole('super_admin');
+export async function setConfigAction(_prev: ConfigSaveState, formData: FormData): Promise<ConfigSaveState> {  await requireRole('super_admin');
   const repo = await getRepository();
   const config = await repo.getAppConfig();
   const dailyNewCap = Number(formData.get('dailyNewCap'));
@@ -366,4 +365,24 @@ export async function setConfigAction(_prev: ConfigSaveState, formData: FormData
   await repo.setAppConfig(config);
   revalidatePath('/admin/settings');
   return { ok: true };
+}
+
+/** SWR fetcher for the admin vocabulary list (search / filter / pagination). */
+export async function queryVocabularyAction(input: {
+  q?: string;
+  jlptLevel?: string | null;
+  partOfSpeech?: string | null;
+  page?: number;
+  pageSize?: number;
+}): Promise<VocabularyPage> {
+  await requireRole('admin', 'super_admin');
+  const repo = await getRepository();
+  const query: VocabularyQuery = {
+    q: input.q?.trim() || undefined,
+    jlptLevel: input.jlptLevel ? (input.jlptLevel as JlptLevel) : null,
+    partOfSpeech: input.partOfSpeech ? (input.partOfSpeech as PartOfSpeech) : null,
+    page: input.page ?? 1,
+    pageSize: input.pageSize,
+  };
+  return repo.queryVocabulary(query);
 }

@@ -128,4 +128,49 @@ describe('InMemoryVocabRepo', () => {
     expect(after[target]).toBeTruthy();
     expect(Date.parse(after[target])).toBeGreaterThan(Date.parse(activity[USER]));
   });
+
+  it('paginages, searches and filters the vocabulary list', async () => {
+    const repo = new InMemoryVocabRepo();
+
+    // Pagination: 30 seeded words, page size 10 -> 3 pages
+    const first = await repo.queryVocabulary({ page: 1, pageSize: 10 });
+    expect(first.total).toBe(30);
+    expect(first.totalPages).toBe(3);
+    expect(first.words).toHaveLength(10);
+    expect(first.words[0].vocabulary.id).toBe(1);
+
+    const second = await repo.queryVocabulary({ page: 2, pageSize: 10 });
+    expect(second.words[0].vocabulary.id).toBe(11);
+
+    // Search by kanji
+    const byKanji = await repo.queryVocabulary({ q: '水' });
+    expect(byKanji.total).toBe(1);
+    expect(byKanji.words[0].vocabulary.kanji).toBe('水');
+
+    // Search by meaning (Indonesian)
+    const byMeaning = await repo.queryVocabulary({ q: 'makan' });
+    expect(byMeaning.total).toBeGreaterThan(0);
+    expect(byMeaning.words.some((w) => w.translations['id'] === 'makan')).toBe(true);
+
+    // Filter by part of speech
+    const nouns = await repo.queryVocabulary({ partOfSpeech: 'noun' });
+    expect(nouns.words.length).toBeGreaterThan(0);
+    expect(nouns.words.every((w) => w.vocabulary.partOfSpeech === 'noun')).toBe(true);
+
+    const verbs = await repo.queryVocabulary({ partOfSpeech: 'verb' });
+    expect(verbs.words.length).toBeGreaterThan(0);
+    expect(verbs.words.every((w) => w.vocabulary.partOfSpeech === 'verb')).toBe(true);
+
+    // Filter by level
+    const n5 = await repo.queryVocabulary({ jlptLevel: 'N5' });
+    expect(n5.total).toBe(30);
+
+    // Combined filter: verb + search
+    const verbSearch = await repo.queryVocabulary({ partOfSpeech: 'verb', q: 'makan' });
+    expect(verbSearch.total).toBe(1);
+    expect(verbSearch.words[0].vocabulary.kanji).toBe('食べる');
+
+    // countVocabulary matches queryVocabulary total
+    expect(await repo.countVocabulary({ partOfSpeech: 'noun' })).toBe((await repo.queryVocabulary({ partOfSpeech: 'noun' })).total);
+  });
 });

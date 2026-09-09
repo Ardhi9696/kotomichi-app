@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { requireLearner, getStudyContext } from '@/lib/server/dal';
+import { getRepository } from '@/lib/server/runtime';
 import { buildStudyCard } from '@/lib/srs/study-card';
 import { DIRECTIONS } from '@/lib/srs/directions';
 import { pickMeaning } from '@/lib/srs/meaning';
@@ -12,7 +13,9 @@ import type {
   QuizPageData,
   ReviewPageData,
   WordsPageData,
+  AdminVocabPageData,
 } from '@/lib/page-data/types';
+import type { VocabularyQuery } from '@/lib/ports/db-port';
 
 /** Words (and therefore questions) served per quiz session. */
 const WORDS_PER_SESSION = 5;
@@ -186,4 +189,11 @@ export async function loadDashboardPageData(): Promise<DashboardPageData> {
     activity,
     dayDetails: dayDetails.filter((d) => d.date <= today),
   };
+}
+
+/** Admin vocabulary list snapshot for a given search/filter/page. */
+export async function loadAdminVocabPageData(query: VocabularyQuery): Promise<AdminVocabPageData> {
+  const repo = await getRepository();
+  const page = await repo.queryVocabulary(query);
+  return { query, page };
 }

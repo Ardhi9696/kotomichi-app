@@ -1,5 +1,6 @@
 import type { ActivityDay, DayDetail, PartOfSpeech, StudyCard } from '@/lib/domain';
 import type { QuizMode, QuizQuestion } from '@/lib/srs/quiz';
+import type { VocabularyPage, VocabularyQuery } from '@/lib/ports/db-port';
 
 /** Snapshot rendered by the /review page and revalidated by SWR. */
 export interface ReviewPageData {
@@ -78,4 +79,10 @@ export interface QuizPageData {
   wordCount: number;
   sessionId: number;
   questions: QuizQuestion[];
+}
+
+/** Snapshot for the admin vocabulary list (search/filter/pagination). */
+export interface AdminVocabPageData {
+  query: VocabularyQuery;
+  page: VocabularyPage;
 }
