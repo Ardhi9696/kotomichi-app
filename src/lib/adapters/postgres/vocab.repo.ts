@@ -136,16 +136,25 @@ function toProfile(r: typeof userProfile.$inferSelect): UserProfile {
 /** Build full WordCards for a set of vocabulary ids (bulk). */
 async function buildWords(db: Db, ids: number[]): Promise<WordCard[]> {
   if (ids.length === 0) return [];
-  const vocabRows = await db.select().from(vocabulary).where(inArray(vocabulary.id, ids));
-  const translations = await db
-    .select()
-    .from(vocabularyTranslations)
-    .where(inArray(vocabularyTranslations.vocabularyId, ids));
-  const examples = await db
-    .select()
-    .from(exampleSentences)
-    .where(inArray(exampleSentences.vocabularyId, ids))
-    .orderBy(exampleSentences.id);
+  // All detail queries are independent — run in parallel so 20 words cost
+  // one round-trip batch instead of six serial round-trips.
+  const [vocabRows, translations, examples, collocs, audio] = await Promise.all([
+    db.select().from(vocabulary).where(inArray(vocabulary.id, ids)),
+    db
+      .select()
+      .from(vocabularyTranslations)
+      .where(inArray(vocabularyTranslations.vocabularyId, ids)),
+    db
+      .select()
+      .from(exampleSentences)
+      .where(inArray(exampleSentences.vocabularyId, ids))
+      .orderBy(exampleSentences.id),
+    db
+      .select()
+      .from(verbCollocations)
+      .where(inArray(verbCollocations.vocabularyId, ids)),
+    db.select().from(audioAssets).where(inArray(audioAssets.vocabularyId, ids)),
+  ]);
   const exIds = examples.map((e) => e.id);
   const exTrans = exIds.length
     ? await db
@@ -153,14 +162,6 @@ async function buildWords(db: Db, ids: number[]): Promise<WordCard[]> {
         .from(exampleSentenceTranslations)
         .where(inArray(exampleSentenceTranslations.exampleSentenceId, exIds))
     : [];
-  const collocs = await db
-    .select()
-    .from(verbCollocations)
-    .where(inArray(verbCollocations.vocabularyId, ids));
-  const audio = await db
-    .select()
-    .from(audioAssets)
-    .where(inArray(audioAssets.vocabularyId, ids));
 
   const transByVocab = new Map<number, Record<string, string>>();
   for (const t of translations) {
@@ -374,7 +375,10 @@ export class PostgresVocabRepo implements VocabRepository {
         or(
           letLike(vocabulary.kanji, q),
           letLike(vocabulary.hiragana, q),
-          sql`EXISTS (SELECT 1 FROM vocabulary_translations vt WHERE vt.vocabulary_id = vocabulary.id AND vt.meaning ILIKE ${'%' + q + '%'})`,
+          // Non-correlated IN subquery instead of correlated EXISTS: Postgres
+          // evaluates the translation match once (hash semi-join) instead of
+          // probing vocabulary_translations per vocabulary row.
+          sql`${vocabulary.id} IN (SELECT vt.vocabulary_id FROM vocabulary_translations vt WHERE vt.meaning ILIKE ${'%' + q + '%'})`,
         ),
       )
       .orderBy(vocabulary.id)
@@ -390,20 +394,23 @@ export class PostgresVocabRepo implements VocabRepository {
     const conditions = vocabQueryConditions(query);
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const countRows = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(vocabulary)
-      .where(where);
+    // COUNT and page-ID fetch are independent — run in parallel so a single
+    // admin search/page pays one DB round-trip batch instead of two serial.
+    const [countRows, rows] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(vocabulary)
+        .where(where),
+      db
+        .select({ id: vocabulary.id })
+        .from(vocabulary)
+        .where(where)
+        .orderBy(vocabulary.id)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+    ]);
     const total = countRows[0]?.count ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-    const rows = await db
-      .select({ id: vocabulary.id })
-      .from(vocabulary)
-      .where(where)
-      .orderBy(vocabulary.id)
-      .limit(pageSize)
-      .offset((page - 1) * pageSize);
 
     const words = await buildWords(db, rows.map((r) => r.id));
     return {
@@ -1284,12 +1291,15 @@ function vocabQueryConditions(query: VocabularyQuery) {
   const conditions: ReturnType<typeof and>[] = [];
   const q = query.q?.trim();
   if (q) {
+    // Non-correlated IN subquery instead of correlated EXISTS: Postgres
+    // evaluates the translation match once (hash semi-join) instead of
+    // probing vocabulary_translations per vocabulary row.
     conditions.push(
       or(
         letLike(vocabulary.kanji, q),
         letLike(vocabulary.hiragana, q),
         letLike(vocabulary.romaji, q),
-        sql`EXISTS (SELECT 1 FROM vocabulary_translations vt WHERE vt.vocabulary_id = vocabulary.id AND vt.meaning ILIKE ${'%' + q + '%'})`,
+        sql`${vocabulary.id} IN (SELECT vt.vocabulary_id FROM vocabulary_translations vt WHERE vt.meaning ILIKE ${'%' + q + '%'})`,
       )!,
     );
   }

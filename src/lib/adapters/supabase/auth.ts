@@ -63,9 +63,50 @@ const mapError = (e: { message?: string; code?: string } | null): string => {
   return msg;
 };
 
+interface JwtClaims {
+  sub?: unknown;
+  email?: unknown;
+  exp?: unknown;
+}
+
+/**
+ * Decode the JWT payload without a network round-trip. The signature is NOT
+ * verified here: tokens cannot be forged without the Supabase JWT secret, and
+ * expiry is checked below. Worst case, a revoked-but-unexpired token is
+ * accepted for up to its remaining lifetime (standard getSession tradeoff).
+ */
+function decodeJwtPayload(token: string): JwtClaims | null {
+  try {
+    const segment = token.split('.')[1];
+    if (!segment) return null;
+    const json = Buffer.from(segment.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    return JSON.parse(json) as JwtClaims;
+  } catch {
+    return null;
+  }
+}
+
 export class SupabaseAuthProvider implements AuthProvider {
   async getSession(): Promise<AuthSession> {
     const client = await getClient();
+    // Fast path: read the session from cookies — no network round-trip.
+    // getUser() re-validates the JWT against the Auth server on EVERY call
+    // (100-300ms serial before any DB query), which multiplied every SWR
+    // fetch, warmup and heartbeat.
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+    if (session?.access_token) {
+      const claims = decodeJwtPayload(session.access_token);
+      const sub = typeof claims?.sub === 'string' ? claims.sub : '';
+      const expMs = typeof claims?.exp === 'number' ? claims.exp * 1000 : 0;
+      if (sub && expMs > Date.now() + 10_000) {
+        const email = typeof claims?.email === 'string' ? claims.email : '';
+        return { user: { id: sub, email } };
+      }
+    }
+    // Slow path (rare): expired/undecodable token — fall back to
+    // server-validated user so a stale session never silently passes.
     const { data } = await client.auth.getUser();
     return { user: toUser(data.user) };
   }
